@@ -1,5 +1,5 @@
 // Constantes para la API
-const API_URL = "http://localhost:1337"
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:1337"
 
 // Tipos para los datos de la API
 export type User = {
@@ -21,25 +21,23 @@ export type Alimento = {
   carbohidratos: number | null
   grasas: number | null
   tipo: "desayuno" | "almuerzo" | "cena" | "snack" | null
+  fecha: string | null
   createdAt: string
   updatedAt: string
-  documentId?: string
-  fecha?: string | null
-  locale?: string
   publishedAt?: string
 }
 
 export type Ejercicio = {
   id: number
-  attributes: {
-    nombre: string
-    series: number
-    repeticiones: number
-    peso: number
-    categoria: "pecho" | "espalda" | "piernas" | "hombros" | "brazos" | "abdominales" | "cardio"
-    createdAt: string
-    updatedAt: string
-  }
+  nombre: string
+  series: number
+  repeticiones: number
+  peso: number
+  fecha: string
+  categoria: "pecho" | "espalda" | "piernas" | "hombros" | "brazos" | "abdominales" | "cardio"
+  createdAt: string
+  updatedAt: string
+  publishedAt?: string
 }
 
 // Función para obtener el token de autenticación
@@ -110,28 +108,34 @@ export const fetchAPI = async (endpoint: string, options: RequestInit = {}): Pro
         removeAuthToken()
       }
 
-      const errorData = await response.json().catch(() => ({
-        message: `Error HTTP: ${response.status} ${response.statusText}`,
-      }))
+      let errorMessage = `Error HTTP: ${response.status} ${response.statusText}`
 
-      throw errorData
+      try {
+        const errorData = await response.json()
+        errorMessage = errorData.error?.message || errorData.message || errorMessage
+      } catch (e) {
+        // Si no podemos parsear la respuesta como JSON, usamos el mensaje por defecto
+      }
+
+      throw new Error(errorMessage)
     }
 
-    const data = await response.json()
+    // Si la respuesta tiene un cuerpo, parsear como JSON
+    let data = {}
+    if (response.status !== 204) {
+      // Código HTTP 204 significa sin contenido
+      data = await response.json()
+    }
 
     // Si la respuesta incluye un token JWT, lo guardamos
-    if (data.jwt) {
+    if (data && data.jwt) {
       setAuthToken(data.jwt)
     }
 
     return data
   } catch (error) {
-    if (error instanceof Error) {
-      console.error("Error al realizar la petición:", error.message);
-    } else {
-      console.error("Error desconocido:", error);
-    }
-    throw error;
+    console.error("Error al realizar la petición:", error)
+    throw error
   }
 }
 
@@ -146,6 +150,42 @@ export const login = async (identifier: string, password: string): Promise<any> 
     return response
   } catch (error) {
     console.error("Error al iniciar sesión:", error)
+    throw error
+  }
+}
+
+// Función para iniciar sesión con Google
+export const loginWithGoogle = async (): Promise<void> => {
+  try {
+    // Redirigir al usuario a la URL de autenticación de Google en Strapi
+    window.location.href = `${API_URL}/api/connect/google`
+  } catch (error) {
+    console.error("Error al iniciar sesión con Google:", error)
+    throw error
+  }
+}
+
+// Función para manejar la redirección después del login con Google
+export const handleOAuthCallback = async (queryParams: URLSearchParams): Promise<any> => {
+  try {
+    // Verificar si hay un token en los parámetros de la URL
+    const accessToken = queryParams.get("access_token")
+
+    if (accessToken) {
+      // Guardar el token
+      setAuthToken(accessToken)
+      return { success: true }
+    }
+
+    // Si no hay token, verificar si hay un código de error
+    const error = queryParams.get("error")
+    if (error) {
+      throw new Error(error)
+    }
+
+    return { success: false, message: "No se recibió un token de acceso" }
+  } catch (error) {
+    console.error("Error al procesar la redirección OAuth:", error)
     throw error
   }
 }
@@ -185,7 +225,7 @@ export const getAlimentos = async (params: Record<string, any> = {}): Promise<an
 
   const queryString = queryParams.toString() ? `?${queryParams.toString()}` : ""
 
-  return fetchAPI(`/api/alimentos`)
+  return fetchAPI(`/api/alimentos${queryString}`)
 }
 
 // Función para obtener un alimento por ID
@@ -203,20 +243,45 @@ export const createAlimento = async (data: any): Promise<any> => {
 
 // Función para actualizar un alimento
 export const updateAlimento = async (id: number, data: any): Promise<any> => {
+  // Asegurarse de que estamos enviando solo los datos necesarios
+  const { nombre, calorias, proteinas, carbohidratos, grasas, fecha, tipo } = data
+
+  const updateData = {
+    nombre,
+    calorias,
+    proteinas,
+    carbohidratos,
+    grasas,
+    fecha,
+    tipo,
+  }
+
   return fetchAPI(`/api/alimentos/${id}`, {
     method: "PUT",
-    body: JSON.stringify({ data }),
+    body: JSON.stringify({ data: updateData }),
   })
 }
 
 // Función para eliminar un alimento
 export const deleteAlimento = async (id: number): Promise<any> => {
-  return fetchAPI(`/api/alimentos/${id}`, {
-    method: "DELETE",
-  })
+  try {
+    const response = await fetchAPI(`/api/alimentos/${id}`, {
+      method: "DELETE",
+    })
+
+    // Verificar que la eliminación fue exitosa
+    if (response) {
+      return { success: true, id }
+    } else {
+      throw new Error("No se pudo eliminar el alimento")
+    }
+  } catch (error) {
+    console.error("Error al eliminar alimento:", error)
+    throw error
+  }
 }
 
-// Función para obtener ejercicios (antes entrenos)
+// Función para obtener ejercicios
 export const getEjercicios = async (params: Record<string, any> = {}): Promise<any> => {
   const queryParams = new URLSearchParams()
 
@@ -245,17 +310,41 @@ export const createEjercicio = async (data: any): Promise<any> => {
 
 // Función para actualizar un ejercicio
 export const updateEjercicio = async (id: number, data: any): Promise<any> => {
+  // Asegurarse de que estamos enviando solo los datos necesarios
+  const { nombre, series, repeticiones, peso, fecha, categoria } = data
+
+  const updateData = {
+    nombre,
+    series,
+    repeticiones,
+    peso,
+    fecha,
+    categoria,
+  }
+
   return fetchAPI(`/api/ejercicios/${id}`, {
     method: "PUT",
-    body: JSON.stringify({ data }),
+    body: JSON.stringify({ data: updateData }),
   })
 }
 
 // Función para eliminar un ejercicio
 export const deleteEjercicio = async (id: number): Promise<any> => {
-  return fetchAPI(`/api/ejercicios/${id}`, {
-    method: "DELETE",
-  })
+  try {
+    const response = await fetchAPI(`/api/ejercicios/${id}`, {
+      method: "DELETE",
+    })
+
+    // Verificar que la eliminación fue exitosa
+    if (response) {
+      return { success: true, id }
+    } else {
+      throw new Error("No se pudo eliminar el ejercicio")
+    }
+  } catch (error) {
+    console.error("Error al eliminar ejercicio:", error)
+    throw error
+  }
 }
 
 // Función para obtener el historial de alimentos
@@ -268,7 +357,9 @@ export const getHistorialAlimentos = async (params: Record<string, any> = {}): P
   })
 
   // Añadir parámetros de ordenación y agrupación
-  queryParams.append("sort", "fecha:desc")
+  if (!params.sort) {
+    queryParams.append("sort", "fecha:desc")
+  }
 
   const queryString = queryParams.toString() ? `?${queryParams.toString()}` : ""
 
@@ -285,7 +376,9 @@ export const getHistorialEjercicios = async (params: Record<string, any> = {}): 
   })
 
   // Añadir parámetros de ordenación y agrupación
-  queryParams.append("sort", "fecha:desc")
+  if (!params.sort) {
+    queryParams.append("sort", "fecha:desc")
+  }
 
   const queryString = queryParams.toString() ? `?${queryParams.toString()}` : ""
 

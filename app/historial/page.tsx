@@ -29,7 +29,9 @@ const agruparAlimentosPorFecha = (alimentos: Alimento[]): AlimentoHistorial[] =>
   const grupos: Record<string, Alimento[]> = {}
 
   alimentos.forEach((alimento) => {
-    const fecha = alimento.attributes.fecha
+    if (!alimento.fecha) return // Ignorar alimentos sin fecha
+
+    const fecha = alimento.fecha
     if (!grupos[fecha]) {
       grupos[fecha] = []
     }
@@ -49,7 +51,9 @@ const agruparEjerciciosPorFecha = (ejercicios: Ejercicio[]): EjercicioHistorial[
   const grupos: Record<string, Ejercicio[]> = {}
 
   ejercicios.forEach((ejercicio) => {
-    const fecha = ejercicio.attributes.fecha
+    if (!ejercicio.fecha) return // Ignorar ejercicios sin fecha
+
+    const fecha = ejercicio.fecha
     if (!grupos[fecha]) {
       grupos[fecha] = []
     }
@@ -115,7 +119,7 @@ export default function HistorialPage() {
       }
 
       const alimentosResponse = await getHistorialAlimentos(alimentosParams)
-      const alimentosAgrupados = agruparAlimentosPorFecha(alimentosResponse.data)
+      const alimentosAgrupados = agruparAlimentosPorFecha(alimentosResponse.data || [])
       setAlimentosHistorial(alimentosAgrupados)
 
       // Obtener historial de ejercicios
@@ -126,7 +130,7 @@ export default function HistorialPage() {
       }
 
       const ejerciciosResponse = await getHistorialEjercicios(ejerciciosParams)
-      const ejerciciosAgrupados = agruparEjerciciosPorFecha(ejerciciosResponse.data)
+      const ejerciciosAgrupados = agruparEjerciciosPorFecha(ejerciciosResponse.data || [])
       setEjerciciosHistorial(ejerciciosAgrupados)
     } catch (err) {
       setError("Error al cargar el historial. Por favor, inténtalo de nuevo.")
@@ -148,10 +152,10 @@ export default function HistorialPage() {
     return alimentos.reduce(
       (acc, alimento) => {
         return {
-          calorias: acc.calorias + alimento.attributes.calorias,
-          proteinas: acc.proteinas + alimento.attributes.proteinas,
-          carbohidratos: acc.carbohidratos + alimento.attributes.carbohidratos,
-          grasas: acc.grasas + alimento.attributes.grasas,
+          calorias: acc.calorias + (alimento.calorias || 0),
+          proteinas: acc.proteinas + (alimento.proteinas || 0),
+          carbohidratos: acc.carbohidratos + (alimento.carbohidratos || 0),
+          grasas: acc.grasas + (alimento.grasas || 0),
         }
       },
       { calorias: 0, proteinas: 0, carbohidratos: 0, grasas: 0 },
@@ -279,16 +283,20 @@ export default function HistorialPage() {
                           <TableBody>
                             {dia.alimentos.map((alimento) => (
                               <TableRow key={alimento.id}>
-                                <TableCell className="font-medium">{alimento.attributes.nombre}</TableCell>
+                                <TableCell className="font-medium">{alimento.nombre}</TableCell>
                                 <TableCell className="hidden md:table-cell">
-                                  {alimento.attributes.calorias} kcal
+                                  {alimento.calorias !== null ? `${alimento.calorias} kcal` : "N/A"}
                                 </TableCell>
-                                <TableCell className="hidden md:table-cell">{alimento.attributes.proteinas}g</TableCell>
                                 <TableCell className="hidden md:table-cell">
-                                  {alimento.attributes.carbohidratos}g
+                                  {alimento.proteinas !== null ? `${alimento.proteinas}g` : "N/A"}
                                 </TableCell>
-                                <TableCell className="hidden md:table-cell">{alimento.attributes.grasas}g</TableCell>
-                                <TableCell className="capitalize">{alimento.attributes.comida}</TableCell>
+                                <TableCell className="hidden md:table-cell">
+                                  {alimento.carbohidratos !== null ? `${alimento.carbohidratos}g` : "N/A"}
+                                </TableCell>
+                                <TableCell className="hidden md:table-cell">
+                                  {alimento.grasas !== null ? `${alimento.grasas}g` : "N/A"}
+                                </TableCell>
+                                <TableCell className="capitalize">{alimento.tipo || "Sin especificar"}</TableCell>
                               </TableRow>
                             ))}
                           </TableBody>
@@ -339,8 +347,7 @@ export default function HistorialPage() {
                       <div className="flex items-center justify-between">
                         <CardTitle>{formatearFecha(dia.fecha)}</CardTitle>
                         <Badge variant="outline">
-                          {dia.ejercicios.reduce((acc, ejercicio) => acc + ejercicio.attributes.series, 0)} series
-                          totales
+                          {dia.ejercicios.reduce((acc, ejercicio) => acc + ejercicio.series, 0)} series totales
                         </Badge>
                       </div>
                       <CardDescription>{dia.ejercicios.length} ejercicios realizados</CardDescription>
@@ -359,23 +366,19 @@ export default function HistorialPage() {
                         <TableBody>
                           {dia.ejercicios.map((ejercicio) => (
                             <TableRow key={ejercicio.id}>
-                              <TableCell className="font-medium">{ejercicio.attributes.nombre}</TableCell>
-                              <TableCell className="hidden md:table-cell">{ejercicio.attributes.series}</TableCell>
-                              <TableCell className="hidden md:table-cell">
-                                {ejercicio.attributes.repeticiones}
-                              </TableCell>
-                              <TableCell className="hidden md:table-cell">{ejercicio.attributes.peso}</TableCell>
-                              <TableCell className="capitalize">{ejercicio.attributes.categoria}</TableCell>
+                              <TableCell className="font-medium">{ejercicio.nombre}</TableCell>
+                              <TableCell className="hidden md:table-cell">{ejercicio.series}</TableCell>
+                              <TableCell className="hidden md:table-cell">{ejercicio.repeticiones}</TableCell>
+                              <TableCell className="hidden md:table-cell">{ejercicio.peso}</TableCell>
+                              <TableCell className="capitalize">{ejercicio.categoria}</TableCell>
                             </TableRow>
                           ))}
                         </TableBody>
                       </Table>
 
                       <div className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-4">
-                        {Array.from(new Set(dia.ejercicios.map((e) => e.attributes.categoria))).map((categoria) => {
-                          const ejerciciosPorCategoria = dia.ejercicios.filter(
-                            (e) => e.attributes.categoria === categoria,
-                          ).length
+                        {Array.from(new Set(dia.ejercicios.map((e) => e.categoria))).map((categoria) => {
+                          const ejerciciosPorCategoria = dia.ejercicios.filter((e) => e.categoria === categoria).length
                           return (
                             <div key={categoria} className="rounded-lg border p-3">
                               <div className="text-sm text-muted-foreground capitalize">{categoria}</div>

@@ -26,7 +26,7 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
-                <Link href="/entrenos" className="text-sm text-muted-foreground hover:text-foreground">
+                <Link href="/ejercicios" className="text-sm text-muted-foreground hover:text-foreground">
                   Entrenos
                 </Link>
               </li>

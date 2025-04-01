@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useState, useEffect } from "react"
-import { Plus, Edit, Trash, Save, Loader2, Filter } from "lucide-react"
+import { Plus, Search, Edit, Trash, Save, Loader2, Filter } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -52,43 +52,17 @@ export default function AlimentosPage() {
   const [alimentoEditando, setAlimentoEditando] = useState<Alimento | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  const [searchTerm, setSearchTerm] = useState("")
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [date, setDate] = useState<Date | undefined>(new Date())
   const [isFilterOpen, setIsFilterOpen] = useState(false)
-  const [filterDate, setFilterDate] = useState<Date | null>(null)
   const [filterTipo, setFilterTipo] = useState<string | null>(null)
-  const [totalCalorias, setTotalCalorias] = useState(0)
-  const [totalProteinas, setTotalProteinas] = useState(0)
-  const [totalCarbohidratos, setTotalCarbohidratos] = useState(0)
-  const [totalGrasas, setTotalGrasas] = useState(0)
 
   // Cargar alimentos al montar el componente
   useEffect(() => {
     fetchAlimentos()
   }, [])
-
-  // Calcular totales cuando cambian los alimentos
-  useEffect(() => {
-    if (alimentos && alimentos.length > 0) {
-      // Calcular totales
-      const calorias = alimentos.reduce((sum, alimento) => sum + (alimento.calorias || 0), 0)
-      const proteinas = alimentos.reduce((sum, alimento) => sum + (alimento.proteinas || 0), 0)
-      const carbohidratos = alimentos.reduce((sum, alimento) => sum + (alimento.carbohidratos || 0), 0)
-      const grasas = alimentos.reduce((sum, alimento) => sum + (alimento.grasas || 0), 0)
-
-      setTotalCalorias(calorias)
-      setTotalProteinas(proteinas)
-      setTotalCarbohidratos(carbohidratos)
-      setTotalGrasas(grasas)
-    } else {
-      // Reiniciar totales si no hay alimentos
-      setTotalCalorias(0)
-      setTotalProteinas(0)
-      setTotalCarbohidratos(0)
-      setTotalGrasas(0)
-    }
-  }, [alimentos])
 
   // Función para obtener alimentos desde la API
   const fetchAlimentos = async () => {
@@ -98,17 +72,12 @@ export default function AlimentosPage() {
       const params: Record<string, any> = {}
 
       // Aplicar filtros SOLO si existen valores seleccionados
-      if (filterDate) {
-        const formattedDate = format(filterDate, "yyyy-MM-dd")
-        params["filters[fecha][$eq]"] = formattedDate
-      }
-
-      if (filterTipo && filterTipo !== "") {
+      if (filterTipo && filterTipo !== "todos") {
         params["filters[tipo][$eq]"] = filterTipo
       }
 
       const response = await getAlimentos(params)
-      setAlimentos(response.data)
+      setAlimentos(response.data || [])
     } catch (err) {
       setError("Error al cargar los alimentos. Por favor, inténtalo de nuevo.")
       console.error(err)
@@ -163,11 +132,23 @@ export default function AlimentosPage() {
     }
   }
 
+  // Modificar la función handleSaveEdit para manejar correctamente el objeto alimentoEditando
   const handleSaveEdit = async () => {
     if (!alimentoEditando) return
 
     try {
-      const response = await updateAlimento(alimentoEditando.id, alimentoEditando)
+      // Extraer solo los campos necesarios para la actualización
+      const dataToUpdate = {
+        nombre: alimentoEditando.nombre || "",
+        calorias: alimentoEditando.calorias || 0,
+        proteinas: alimentoEditando.proteinas || 0,
+        carbohidratos: alimentoEditando.carbohidratos || 0,
+        grasas: alimentoEditando.grasas || 0,
+        fecha: alimentoEditando.fecha || new Date().toISOString().split("T")[0],
+        tipo: alimentoEditando.tipo || "desayuno",
+      }
+
+      const response = await updateAlimento(alimentoEditando.id, dataToUpdate)
       setAlimentos(alimentos.map((alimento) => (alimento.id === alimentoEditando.id ? response.data : alimento)))
       setAlimentoEditando(null)
       setIsEditDialogOpen(false)
@@ -212,11 +193,48 @@ export default function AlimentosPage() {
   }
 
   const handleFilterClear = () => {
-    setFilterDate(null)
     setFilterTipo(null)
     setIsFilterOpen(false)
-    fetchAlimentos()
+
+    // Llamar a fetchAlimentos sin filtros para cargar todos los alimentos
+    const fetchAllAlimentos = async () => {
+      setIsLoading(true)
+      try {
+        const response = await getAlimentos({})
+        setAlimentos(response.data || [])
+      } catch (err) {
+        setError("Error al cargar los alimentos. Por favor, inténtalo de nuevo.")
+        console.error(err)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchAllAlimentos()
   }
+
+  const filteredAlimentos = alimentos.filter((alimento) =>
+    alimento && alimento.nombre ? alimento.nombre.toLowerCase().includes(searchTerm.toLowerCase()) : false,
+  )
+
+  // Calcular totales asegurando que sean números
+  const totals = filteredAlimentos.reduce(
+    (acc, alimento) => {
+      // Convertir explícitamente a números para evitar concatenación de strings
+      const calorias = Number(alimento.calorias) || 0
+      const proteinas = Number(alimento.proteinas) || 0
+      const carbohidratos = Number(alimento.carbohidratos) || 0
+      const grasas = Number(alimento.grasas) || 0
+
+      return {
+        totalCalorias: acc.totalCalorias + calorias,
+        totalProteinas: acc.totalProteinas + proteinas,
+        totalCarbohidratos: acc.totalCarbohidratos + carbohidratos,
+        totalGrasas: acc.totalGrasas + grasas,
+      }
+    },
+    { totalCalorias: 0, totalProteinas: 0, totalCarbohidratos: 0, totalGrasas: 0 },
+  )
 
   return (
     <AuthGuard>
@@ -231,34 +249,35 @@ export default function AlimentosPage() {
 
         <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+            <div className="relative w-full sm:w-64">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="search"
+                placeholder="Buscar alimentos..."
+                className="pl-8"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+
             <Popover open={isFilterOpen} onOpenChange={setIsFilterOpen}>
               <PopoverTrigger asChild>
                 <Button variant="outline" className="w-full sm:w-auto">
                   <Filter className="mr-2 h-4 w-4" />
                   Filtros
-                  {(filterDate || filterTipo) && <span className="ml-1 rounded-full bg-primary w-2 h-2"></span>}
+                  {filterTipo && <span className="ml-1 rounded-full bg-primary w-2 h-2"></span>}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-80">
                 <div className="grid gap-4">
                   <div className="space-y-2">
-                    <h4 className="font-medium">Filtrar por fecha</h4>
-                    <Calendar
-                      mode="single"
-                      selected={filterDate || undefined}
-                      onSelect={(date) => setFilterDate(date)}
-                      locale={es}
-                      className="rounded-md border"
-                    />
-                  </div>
-                  <div className="space-y-2">
                     <h4 className="font-medium">Filtrar por tipo</h4>
-                    <Select value={filterTipo || ""} onValueChange={setFilterTipo}>
+                    <Select value={filterTipo || "todos"} onValueChange={setFilterTipo}>
                       <SelectTrigger>
                         <SelectValue placeholder="Seleccionar tipo" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Todas</SelectItem>
+                        <SelectItem value="todos">Todas</SelectItem>
                         <SelectItem value="desayuno">Desayuno</SelectItem>
                         <SelectItem value="almuerzo">Almuerzo</SelectItem>
                         <SelectItem value="cena">Cena</SelectItem>
@@ -348,7 +367,18 @@ export default function AlimentosPage() {
                         </Button>
                       </PopoverTrigger>
                       <PopoverContent className="w-auto p-0">
-                        <Calendar mode="single" selected={date} onSelect={handleDateSelect} locale={es} />
+                        <div className="border rounded-md">
+                          <Calendar
+                            mode="single"
+                            selected={date}
+                            onSelect={handleDateSelect}
+                            locale={es}
+                            className="p-0"
+                            initialFocus
+                            fixedWeeks
+                            ISOWeek
+                          />
+                        </div>
                       </PopoverContent>
                     </Popover>
                   </div>
@@ -391,7 +421,7 @@ export default function AlimentosPage() {
                     <Input
                       id="edit-nombre"
                       name="nombre"
-                      value={alimentoEditando.nombre}
+                      value={alimentoEditando.nombre || ""}
                       onChange={handleEditInputChange}
                     />
                   </div>
@@ -402,7 +432,7 @@ export default function AlimentosPage() {
                         id="edit-calorias"
                         name="calorias"
                         type="number"
-                        value={alimentoEditando.calorias}
+                        value={alimentoEditando.calorias || 0}
                         onChange={handleEditInputChange}
                       />
                     </div>
@@ -412,7 +442,7 @@ export default function AlimentosPage() {
                         id="edit-proteinas"
                         name="proteinas"
                         type="number"
-                        value={alimentoEditando.proteinas}
+                        value={alimentoEditando.proteinas || 0}
                         onChange={handleEditInputChange}
                       />
                     </div>
@@ -424,7 +454,7 @@ export default function AlimentosPage() {
                         id="edit-carbohidratos"
                         name="carbohidratos"
                         type="number"
-                        value={alimentoEditando.carbohidratos}
+                        value={alimentoEditando.carbohidratos || 0}
                         onChange={handleEditInputChange}
                       />
                     </div>
@@ -434,7 +464,7 @@ export default function AlimentosPage() {
                         id="edit-grasas"
                         name="grasas"
                         type="number"
-                        value={alimentoEditando.grasas}
+                        value={alimentoEditando.grasas || 0}
                         onChange={handleEditInputChange}
                       />
                     </div>
@@ -453,19 +483,25 @@ export default function AlimentosPage() {
                           </Button>
                         </PopoverTrigger>
                         <PopoverContent className="w-auto p-0">
-                          <Calendar
-                            mode="single"
-                            selected={new Date(alimentoEditando.fecha)}
-                            onSelect={handleEditDateSelect}
-                            locale={es}
-                          />
+                          <div className="border rounded-md">
+                            <Calendar
+                              mode="single"
+                              selected={alimentoEditando.fecha ? new Date(alimentoEditando.fecha) : undefined}
+                              onSelect={handleEditDateSelect}
+                              locale={es}
+                              className="p-0"
+                              initialFocus
+                              fixedWeeks
+                              ISOWeek
+                            />
+                          </div>
                         </PopoverContent>
                       </Popover>
                     </div>
                     <div className="grid gap-2">
                       <Label htmlFor="edit-tipo">Tipo</Label>
                       <Select
-                        value={alimentoEditando.tipo}
+                        value={alimentoEditando.tipo || "desayuno"}
                         onValueChange={(value) =>
                           setAlimentoEditando({
                             ...alimentoEditando,
@@ -510,7 +546,7 @@ export default function AlimentosPage() {
                   <CardTitle className="text-sm font-medium">Calorías Totales</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{totalCalorias} kcal</div>
+                  <div className="text-2xl font-bold">{totals.totalCalorias} kcal</div>
                 </CardContent>
               </Card>
               <Card>
@@ -518,7 +554,7 @@ export default function AlimentosPage() {
                   <CardTitle className="text-sm font-medium">Proteínas</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{totalProteinas}g</div>
+                  <div className="text-2xl font-bold">{totals.totalProteinas}g</div>
                 </CardContent>
               </Card>
               <Card>
@@ -526,7 +562,7 @@ export default function AlimentosPage() {
                   <CardTitle className="text-sm font-medium">Carbohidratos</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{totalCarbohidratos}g</div>
+                  <div className="text-2xl font-bold">{totals.totalCarbohidratos}g</div>
                 </CardContent>
               </Card>
               <Card>
@@ -534,7 +570,7 @@ export default function AlimentosPage() {
                   <CardTitle className="text-sm font-medium">Grasas</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{totalGrasas}g</div>
+                  <div className="text-2xl font-bold">{totals.totalGrasas}g</div>
                 </CardContent>
               </Card>
             </div>
@@ -550,7 +586,7 @@ export default function AlimentosPage() {
               <TabsContent value="todos">
                 <Card>
                   <CardContent className="p-0">
-                    {alimentos.length === 0 ? (
+                    {filteredAlimentos.length === 0 ? (
                       <div className="flex flex-col items-center justify-center py-12 text-center">
                         <p className="text-muted-foreground mb-4">No hay alimentos registrados</p>
                         <Button onClick={() => setIsDialogOpen(true)}>
@@ -567,19 +603,33 @@ export default function AlimentosPage() {
                             <TableHead className="hidden md:table-cell">Proteínas</TableHead>
                             <TableHead className="hidden md:table-cell">Carbohidratos</TableHead>
                             <TableHead className="hidden md:table-cell">Grasas</TableHead>
-                            <TableHead>Tipo</TableHead>
+                            <TableHead className="hidden md:table-cell">Tipo</TableHead>
+                            <TableHead>Fecha</TableHead>
                             <TableHead className="text-right">Acciones</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {alimentos.map((alimento) => (
+                          {filteredAlimentos.map((alimento) => (
                             <TableRow key={alimento.id}>
                               <TableCell className="font-medium">{alimento.nombre}</TableCell>
-                              <TableCell className="hidden md:table-cell">{alimento.calorias} kcal</TableCell>
-                              <TableCell className="hidden md:table-cell">{alimento.proteinas}g</TableCell>
-                              <TableCell className="hidden md:table-cell">{alimento.carbohidratos}g</TableCell>
-                              <TableCell className="hidden md:table-cell">{alimento.grasas}g</TableCell>
-                              <TableCell className="capitalize">{alimento.tipo}</TableCell>
+                              <TableCell className="hidden md:table-cell">
+                                {alimento.calorias !== null ? `${alimento.calorias} kcal` : "N/A"}
+                              </TableCell>
+                              <TableCell className="hidden md:table-cell">
+                                {alimento.proteinas !== null ? `${alimento.proteinas}g` : "N/A"}
+                              </TableCell>
+                              <TableCell className="hidden md:table-cell">
+                                {alimento.carbohidratos !== null ? `${alimento.carbohidratos}g` : "N/A"}
+                              </TableCell>
+                              <TableCell className="hidden md:table-cell">
+                                {alimento.grasas !== null ? `${alimento.grasas}g` : "N/A"}
+                              </TableCell>
+                              <TableCell className="capitalize">
+                                {alimento.tipo ? alimento.tipo : "Sin especificar"}
+                              </TableCell>
+                              <TableCell>
+                                {alimento.fecha ? new Date(alimento.fecha).toLocaleDateString() : "N/A"}
+                              </TableCell>
                               <TableCell className="text-right">
                                 <Button variant="ghost" size="icon" onClick={() => handleEdit(alimento.id)}>
                                   <Edit className="h-4 w-4" />
@@ -600,7 +650,7 @@ export default function AlimentosPage() {
                 <TabsContent key={tipo} value={tipo}>
                   <Card>
                     <CardContent className="p-0">
-                      {alimentos.filter((alimento) => alimento.tipo === tipo).length === 0 ? (
+                      {filteredAlimentos.filter((alimento) => alimento.tipo === tipo).length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-12 text-center">
                           <p className="text-muted-foreground mb-4">No hay alimentos registrados para {tipo}</p>
                           <Button onClick={() => setIsDialogOpen(true)}>
@@ -621,15 +671,23 @@ export default function AlimentosPage() {
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {alimentos
-                              .filter((alimento) => alimento.tipo === tipo)
+                            {filteredAlimentos
+                              .filter((alimento) => alimento.tipo && alimento.tipo === tipo)
                               .map((alimento) => (
                                 <TableRow key={alimento.id}>
                                   <TableCell className="font-medium">{alimento.nombre}</TableCell>
-                                  <TableCell className="hidden md:table-cell">{alimento.calorias} kcal</TableCell>
-                                  <TableCell className="hidden md:table-cell">{alimento.proteinas}g</TableCell>
-                                  <TableCell className="hidden md:table-cell">{alimento.carbohidratos}g</TableCell>
-                                  <TableCell className="hidden md:table-cell">{alimento.grasas}g</TableCell>
+                                  <TableCell className="hidden md:table-cell">
+                                    {alimento.calorias !== null ? `${alimento.calorias} kcal` : "N/A"}
+                                  </TableCell>
+                                  <TableCell className="hidden md:table-cell">
+                                    {alimento.proteinas !== null ? `${alimento.proteinas}g` : "N/A"}
+                                  </TableCell>
+                                  <TableCell className="hidden md:table-cell">
+                                    {alimento.carbohidratos !== null ? `${alimento.carbohidratos}g` : "N/A"}
+                                  </TableCell>
+                                  <TableCell className="hidden md:table-cell">
+                                    {alimento.grasas !== null ? `${alimento.grasas}g` : "N/A"}
+                                  </TableCell>
                                   <TableCell className="text-right">
                                     <Button variant="ghost" size="icon" onClick={() => handleEdit(alimento.id)}>
                                       <Edit className="h-4 w-4" />

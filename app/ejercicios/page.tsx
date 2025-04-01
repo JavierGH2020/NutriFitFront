@@ -81,7 +81,7 @@ export default function EntrenosPage() {
       }
 
       const response = await getEjercicios(params)
-      setEjercicios(response.data)
+      setEjercicios(response.data || [])
     } catch (err) {
       setError("Error al cargar los ejercicios. Por favor, inténtalo de nuevo.")
       console.error(err)
@@ -104,10 +104,7 @@ export default function EntrenosPage() {
     const { name, value } = e.target
     setEjercicioEditando({
       ...ejercicioEditando,
-      attributes: {
-        ...ejercicioEditando.attributes,
-        [name]: name === "nombre" || name === "fecha" || name === "categoria" ? value : Number(value),
-      },
+      [name]: name === "nombre" || name === "fecha" || name === "categoria" ? value : Number(value),
     })
   }
 
@@ -142,7 +139,17 @@ export default function EntrenosPage() {
     if (!ejercicioEditando) return
 
     try {
-      const response = await updateEjercicio(ejercicioEditando.id, ejercicioEditando.attributes)
+      // Extraer solo los campos necesarios para la actualización
+      const dataToUpdate = {
+        nombre: ejercicioEditando.nombre || "",
+        series: ejercicioEditando.series || 0,
+        repeticiones: ejercicioEditando.repeticiones || 0,
+        peso: ejercicioEditando.peso || 0,
+        fecha: ejercicioEditando.fecha || new Date().toISOString().split("T")[0],
+        categoria: ejercicioEditando.categoria || "pecho",
+      }
+
+      const response = await updateEjercicio(ejercicioEditando.id, dataToUpdate)
       setEjercicios(ejercicios.map((ejercicio) => (ejercicio.id === ejercicioEditando.id ? response.data : ejercicio)))
       setEjercicioEditando(null)
       setIsEditDialogOpen(false)
@@ -154,8 +161,12 @@ export default function EntrenosPage() {
 
   const handleDelete = async (id: number) => {
     try {
-      await deleteEjercicio(id)
-      setEjercicios(ejercicios.filter((ejercicio) => ejercicio.id !== id))
+      const result = await deleteEjercicio(id)
+      if (result.success) {
+        setEjercicios(ejercicios.filter((ejercicio) => ejercicio.id !== id))
+      } else {
+        throw new Error("No se pudo eliminar el ejercicio")
+      }
     } catch (err) {
       setError("Error al eliminar el ejercicio. Por favor, inténtalo de nuevo.")
       console.error(err)
@@ -176,10 +187,7 @@ export default function EntrenosPage() {
     if (date && ejercicioEditando) {
       setEjercicioEditando({
         ...ejercicioEditando,
-        attributes: {
-          ...ejercicioEditando.attributes,
-          fecha: format(date, "yyyy-MM-dd"),
-        },
+        fecha: format(date, "yyyy-MM-dd"),
       })
     }
   }
@@ -197,7 +205,7 @@ export default function EntrenosPage() {
   }
 
   const filteredEjercicios = ejercicios.filter((ejercicio) =>
-    ejercicio.attributes.nombre.toLowerCase().includes(searchTerm.toLowerCase()),
+    ejercicio.nombre.toLowerCase().includes(searchTerm.toLowerCase()),
   )
 
   const categorias = ["pecho", "espalda", "piernas", "hombros", "brazos", "abdominales", "cardio"]
@@ -376,7 +384,7 @@ export default function EntrenosPage() {
                     <Input
                       id="edit-nombre"
                       name="nombre"
-                      value={ejercicioEditando.attributes.nombre}
+                      value={ejercicioEditando.nombre}
                       onChange={handleEditInputChange}
                     />
                   </div>
@@ -387,7 +395,7 @@ export default function EntrenosPage() {
                         id="edit-series"
                         name="series"
                         type="number"
-                        value={ejercicioEditando.attributes.series}
+                        value={ejercicioEditando.series}
                         onChange={handleEditInputChange}
                       />
                     </div>
@@ -397,7 +405,7 @@ export default function EntrenosPage() {
                         id="edit-repeticiones"
                         name="repeticiones"
                         type="number"
-                        value={ejercicioEditando.attributes.repeticiones}
+                        value={ejercicioEditando.repeticiones}
                         onChange={handleEditInputChange}
                       />
                     </div>
@@ -407,7 +415,7 @@ export default function EntrenosPage() {
                         id="edit-peso"
                         name="peso"
                         type="number"
-                        value={ejercicioEditando.attributes.peso}
+                        value={ejercicioEditando.peso}
                         onChange={handleEditInputChange}
                       />
                     </div>
@@ -418,8 +426,8 @@ export default function EntrenosPage() {
                       <Popover>
                         <PopoverTrigger asChild>
                           <Button variant="outline" className="w-full justify-start text-left font-normal">
-                            {ejercicioEditando.attributes.fecha ? (
-                              format(new Date(ejercicioEditando.attributes.fecha), "PPP", { locale: es })
+                            {ejercicioEditando.fecha ? (
+                              format(new Date(ejercicioEditando.fecha), "PPP", { locale: es })
                             ) : (
                               <span>Seleccionar fecha</span>
                             )}
@@ -428,7 +436,7 @@ export default function EntrenosPage() {
                         <PopoverContent className="w-auto p-0">
                           <Calendar
                             mode="single"
-                            selected={new Date(ejercicioEditando.attributes.fecha)}
+                            selected={new Date(ejercicioEditando.fecha)}
                             onSelect={handleEditDateSelect}
                             locale={es}
                           />
@@ -438,14 +446,11 @@ export default function EntrenosPage() {
                     <div className="grid gap-2">
                       <Label htmlFor="edit-categoria">Categoría</Label>
                       <Select
-                        value={ejercicioEditando.attributes.categoria}
+                        value={ejercicioEditando.categoria}
                         onValueChange={(value) =>
                           setEjercicioEditando({
                             ...ejercicioEditando,
-                            attributes: {
-                              ...ejercicioEditando.attributes,
-                              categoria: value as any,
-                            },
+                            categoria: value as any,
                           })
                         }
                       >
@@ -514,11 +519,11 @@ export default function EntrenosPage() {
                       <TableBody>
                         {filteredEjercicios.map((ejercicio) => (
                           <TableRow key={ejercicio.id}>
-                            <TableCell className="font-medium">{ejercicio.attributes.nombre}</TableCell>
-                            <TableCell className="hidden md:table-cell">{ejercicio.attributes.series}</TableCell>
-                            <TableCell className="hidden md:table-cell">{ejercicio.attributes.repeticiones}</TableCell>
-                            <TableCell className="hidden md:table-cell">{ejercicio.attributes.peso}</TableCell>
-                            <TableCell className="capitalize">{ejercicio.attributes.categoria}</TableCell>
+                            <TableCell className="font-medium">{ejercicio.nombre}</TableCell>
+                            <TableCell className="hidden md:table-cell">{ejercicio.series}</TableCell>
+                            <TableCell className="hidden md:table-cell">{ejercicio.repeticiones}</TableCell>
+                            <TableCell className="hidden md:table-cell">{ejercicio.peso}</TableCell>
+                            <TableCell className="capitalize">{ejercicio.categoria}</TableCell>
                             <TableCell className="text-right">
                               <Button variant="ghost" size="icon" onClick={() => handleEdit(ejercicio.id)}>
                                 <Edit className="h-4 w-4" />
@@ -539,8 +544,7 @@ export default function EntrenosPage() {
               <TabsContent key={categoria} value={categoria}>
                 <Card>
                   <CardContent className="p-0">
-                    {filteredEjercicios.filter((ejercicio) => ejercicio.attributes.categoria === categoria).length ===
-                    0 ? (
+                    {filteredEjercicios.filter((ejercicio) => ejercicio.categoria === categoria).length === 0 ? (
                       <div className="flex flex-col items-center justify-center py-12 text-center">
                         <p className="text-muted-foreground mb-4">No hay ejercicios registrados para {categoria}</p>
                         <Button onClick={() => setIsDialogOpen(true)}>
@@ -562,17 +566,15 @@ export default function EntrenosPage() {
                         </TableHeader>
                         <TableBody>
                           {filteredEjercicios
-                            .filter((ejercicio) => ejercicio.attributes.categoria === categoria)
+                            .filter((ejercicio) => ejercicio.categoria === categoria)
                             .map((ejercicio) => (
                               <TableRow key={ejercicio.id}>
-                                <TableCell className="font-medium">{ejercicio.attributes.nombre}</TableCell>
-                                <TableCell className="hidden md:table-cell">{ejercicio.attributes.series}</TableCell>
+                                <TableCell className="font-medium">{ejercicio.nombre}</TableCell>
+                                <TableCell className="hidden md:table-cell">{ejercicio.series}</TableCell>
+                                <TableCell className="hidden md:table-cell">{ejercicio.repeticiones}</TableCell>
+                                <TableCell className="hidden md:table-cell">{ejercicio.peso}</TableCell>
                                 <TableCell className="hidden md:table-cell">
-                                  {ejercicio.attributes.repeticiones}
-                                </TableCell>
-                                <TableCell className="hidden md:table-cell">{ejercicio.attributes.peso}</TableCell>
-                                <TableCell className="hidden md:table-cell">
-                                  {format(new Date(ejercicio.attributes.fecha), "dd/MM/yyyy")}
+                                  {format(new Date(ejercicio.fecha), "dd/MM/yyyy")}
                                 </TableCell>
                                 <TableCell className="text-right">
                                   <Button variant="ghost" size="icon" onClick={() => handleEdit(ejercicio.id)}>
