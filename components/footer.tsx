@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { Facebook, Instagram, Twitter } from "lucide-react"
+import { Facebook, Instagram, Twitter, Youtube } from "lucide-react"
 
 export default function Footer() {
   return (
@@ -7,7 +7,7 @@ export default function Footer() {
       <div className="container py-8 md:py-12">
         <div className="grid grid-cols-1 gap-8 md:grid-cols-4">
           <div className="space-y-3">
-            <h3 className="text-lg font-medium">NutriFit</h3>
+            <h3 className="text-lg font-medium text-primary">NutriFit</h3>
             <p className="text-sm text-muted-foreground">
               Tu compañero para alcanzar tus metas fitness y mantener un estilo de vida saludable.
             </p>
@@ -26,12 +26,12 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
-                <Link href="/ejercicios" className="text-sm text-muted-foreground hover:text-foreground">
+                <Link href="/entrenos" className="text-sm text-muted-foreground hover:text-foreground">
                   Entrenos
                 </Link>
               </li>
               <li>
-                <Link href="/calculadora" className="text-sm text-muted-foreground hover:text-foreground">
+                <Link href="/calculadora-imc" className="text-sm text-muted-foreground hover:text-foreground">
                   Calculadora IMC
                 </Link>
               </li>
@@ -45,25 +45,29 @@ export default function Footer() {
           <div className="space-y-3">
             <h3 className="text-lg font-medium">Contacto</h3>
             <ul className="space-y-2">
-              <li className="text-sm text-muted-foreground">Email: javier.marzo2020@gmail.com.com</li>
-              <li className="text-sm text-muted-foreground">Teléfono: +34 624 204 740</li>
-              <li className="text-sm text-muted-foreground">Dirección: Calle de la Española, Madrid</li>
+              <li className="text-sm text-muted-foreground">Email: info@nutrifit.com</li>
+              <li className="text-sm text-muted-foreground">Teléfono: +34 123 456 789</li>
+              <li className="text-sm text-muted-foreground">Dirección: Calle Fitness 123, Madrid</li>
             </ul>
           </div>
           <div className="space-y-3">
             <h3 className="text-lg font-medium">Síguenos</h3>
             <div className="flex space-x-4">
-              <Link href="http://facebook.com" className="text-muted-foreground hover:text-foreground">
+              <Link href="#" className="text-muted-foreground hover:text-primary transition-colors">
                 <Facebook className="h-5 w-5" />
                 <span className="sr-only">Facebook</span>
               </Link>
-              <Link href="http://instagram.com" className="text-muted-foreground hover:text-foreground">
+              <Link href="#" className="text-muted-foreground hover:text-primary transition-colors">
                 <Instagram className="h-5 w-5" />
                 <span className="sr-only">Instagram</span>
               </Link>
-              <Link href="http://x.com" className="text-muted-foreground hover:text-foreground">
+              <Link href="#" className="text-muted-foreground hover:text-primary transition-colors">
                 <Twitter className="h-5 w-5" />
                 <span className="sr-only">Twitter</span>
+              </Link>
+              <Link href="#" className="text-muted-foreground hover:text-primary transition-colors">
+                <Youtube className="h-5 w-5" />
+                <span className="sr-only">YouTube</span>
               </Link>
             </div>
           </div>
