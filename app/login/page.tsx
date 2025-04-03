@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useState, useEffect } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Apple, Eye, EyeOff, AlertCircle, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -12,12 +12,11 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { login, loginWithGoogle, handleOAuthCallback, isAuthenticated } from "@/lib/api"
+import { login, loginWithGoogle, isAuthenticated, handleOAuthCallback, cleanAuthParams } from "@/lib/api"
 import { Separator } from "@/components/ui/separator"
 
 export default function LoginPage() {
   const router = useRouter()
-  const searchParams = useSearchParams()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [rememberMe, setRememberMe] = useState(false)
@@ -26,36 +25,36 @@ export default function LoginPage() {
   const [isGoogleLoading, setIsGoogleLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Verificar si el usuario ya está autenticado
+  // Verificar si el usuario ya está autenticado y manejar callback de OAuth
   useEffect(() => {
+    // Verificar si el usuario ya está autenticado
     if (isAuthenticated()) {
       router.push("/")
+      return
     }
-  }, [router])
 
-  // Manejar la redirección después del login con Google
-  useEffect(() => {
-    const handleOAuthRedirect = async () => {
-      // Verificar si hay parámetros de OAuth en la URL
-      if (searchParams.has("access_token") || searchParams.has("error")) {
-        setIsGoogleLoading(true)
-        try {
-          const result = await handleOAuthCallback(searchParams)
+    // Verificar si hay parámetros de OAuth en la URL
+    const searchParams = new URLSearchParams(window.location.search)
+    if (searchParams.has("access_token") || searchParams.has("error")) {
+      setIsGoogleLoading(true)
+      handleOAuthCallback(searchParams)
+        .then((result) => {
           if (result.success) {
+            // Limpiar la URL y redirigir
+            cleanAuthParams()
             router.push("/")
           } else {
             setError(result.message || "Error al iniciar sesión con Google")
           }
-        } catch (err: any) {
+        })
+        .catch((err) => {
           setError(err.message || "Error al procesar la autenticación con Google")
-        } finally {
+        })
+        .finally(() => {
           setIsGoogleLoading(false)
-        }
-      }
+        })
     }
-
-    handleOAuthRedirect()
-  }, [searchParams, router])
+  }, [router])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

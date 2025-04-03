@@ -1,13 +1,21 @@
 "use client"
 
-import { useState } from "react"
-import { Calculator } from "lucide-react"
+import { useState, useEffect } from "react"
+import { Calculator, Save, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { calcularIMC, obtenerCategoriaIMC, obtenerRecomendacionesIMC } from "@/lib/api"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import {
+  calcularIMC,
+  obtenerCategoriaIMC,
+  obtenerRecomendacionesIMC,
+  guardarCalculadoraIMC,
+  isAuthenticated,
+} from "@/lib/api"
+import { useToast } from "@/hooks/use-toast"
 
 export default function CalculadoraIMCPage() {
   const [peso, setPeso] = useState("")
@@ -17,6 +25,14 @@ export default function CalculadoraIMCPage() {
   const [imc, setIMC] = useState<number | null>(null)
   const [categoria, setCategoria] = useState<string | null>(null)
   const [recomendaciones, setRecomendaciones] = useState<string | null>(null)
+  const [isSaving, setIsSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const { toast } = useToast()
+  const [isUserLoggedIn, setIsUserLoggedIn] = useState(false)
+
+  useEffect(() => {
+    setIsUserLoggedIn(isAuthenticated())
+  }, [])
 
   const handleCalcularIMC = () => {
     if (!peso || !altura) return
@@ -37,6 +53,44 @@ export default function CalculadoraIMCPage() {
     setRecomendaciones(recomendacionesIMC)
   }
 
+  const handleGuardarResultado = async () => {
+    if (!imc || !categoria || !isUserLoggedIn) return
+
+    setIsSaving(true)
+    setError(null)
+
+    try {
+      const pesoNum = Number.parseFloat(peso)
+      const alturaNum = Number.parseFloat(altura)
+      const edadNum = edad ? Number.parseInt(edad) : 0
+
+      // Asegurarse de que todos los valores son números válidos
+      if (isNaN(pesoNum) || isNaN(alturaNum) || isNaN(edadNum) || isNaN(imc)) {
+        throw new Error("Valores inválidos. Por favor, verifica los datos ingresados.")
+      }
+
+      await guardarCalculadoraIMC({
+        peso: pesoNum,
+        altura: alturaNum,
+        edad: edadNum,
+        genero,
+        imc,
+        categoria,
+        fecha: new Date().toISOString().split("T")[0],
+      })
+
+      toast({
+        title: "Resultado guardado",
+        description: "Tu IMC ha sido guardado correctamente en tu historial.",
+      })
+    } catch (err) {
+      console.error("Error al guardar IMC:", err)
+      setError("No se pudo guardar el resultado. Por favor, inténtalo de nuevo.")
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
   const limpiarFormulario = () => {
     setPeso("")
     setAltura("")
@@ -49,6 +103,12 @@ export default function CalculadoraIMCPage() {
   return (
     <div className="container py-8">
       <h1 className="mb-6 text-3xl font-bold">Calculadora de IMC</h1>
+
+      {error && (
+        <Alert variant="destructive" className="mb-4">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
 
       <div className="grid gap-6 md:grid-cols-2">
         <Card>
@@ -174,6 +234,22 @@ export default function CalculadoraIMCPage() {
                     </li>
                   </ul>
                 </div>
+
+                {isUserLoggedIn && (
+                  <Button onClick={handleGuardarResultado} disabled={isSaving} className="w-full">
+                    {isSaving ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Guardando...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="mr-2 h-4 w-4" />
+                        Guardar resultado
+                      </>
+                    )}
+                  </Button>
+                )}
               </div>
             )}
           </CardContent>
@@ -182,4 +258,3 @@ export default function CalculadoraIMCPage() {
     </div>
   )
 }
-

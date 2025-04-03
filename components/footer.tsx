@@ -26,12 +26,12 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
-                <Link href="/entrenos" className="text-sm text-muted-foreground hover:text-foreground">
+                <Link href="/ejercicios" className="text-sm text-muted-foreground hover:text-foreground">
                   Entrenos
                 </Link>
               </li>
               <li>
-                <Link href="/calculadora-imc" className="text-sm text-muted-foreground hover:text-foreground">
+                <Link href="/calculadora" className="text-sm text-muted-foreground hover:text-foreground">
                   Calculadora IMC
                 </Link>
               </li>
@@ -53,19 +53,19 @@ export default function Footer() {
           <div className="space-y-3">
             <h3 className="text-lg font-medium">Síguenos</h3>
             <div className="flex space-x-4">
-              <Link href="#" className="text-muted-foreground hover:text-primary transition-colors">
+              <Link href="http://www.facebook.com" className="text-muted-foreground hover:text-primary transition-colors">
                 <Facebook className="h-5 w-5" />
                 <span className="sr-only">Facebook</span>
               </Link>
-              <Link href="#" className="text-muted-foreground hover:text-primary transition-colors">
+              <Link href="http://www.instagram.com" className="text-muted-foreground hover:text-primary transition-colors">
                 <Instagram className="h-5 w-5" />
                 <span className="sr-only">Instagram</span>
               </Link>
-              <Link href="#" className="text-muted-foreground hover:text-primary transition-colors">
+              <Link href="http://www.x.com" className="text-muted-foreground hover:text-primary transition-colors">
                 <Twitter className="h-5 w-5" />
                 <span className="sr-only">Twitter</span>
               </Link>
-              <Link href="#" className="text-muted-foreground hover:text-primary transition-colors">
+              <Link href="http://www.youtube.com" className="text-muted-foreground hover:text-primary transition-colors">
                 <Youtube className="h-5 w-5" />
                 <span className="sr-only">YouTube</span>
               </Link>

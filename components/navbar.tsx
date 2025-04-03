@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { useRouter, usePathname } from "next/navigation"
 import Link from "next/link"
-import { Menu, Apple, LogOut, Target, Database, Sun, Moon, Zap } from "lucide-react"
+import { Menu, Apple, LogOut, Target, Database, Sun, Moon, Zap, User } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import {
@@ -63,8 +63,8 @@ export default function Navbar() {
   const navLinks = [
     { name: "Inicio", href: "/" },
     { name: "Alimentos", href: "/alimentos" },
-    { name: "Entrenos", href: "/entrenos" },
-    { name: "Calculadora IMC", href: "/calculadora-imc" },
+    { name: "Entrenos", href: "/ejercicios" },
+    { name: "Calculadora IMC", href: "/calculadora" },
     { name: "Historial", href: "/historial" },
   ]
 
@@ -99,14 +99,6 @@ export default function Navbar() {
         <div className="flex items-center gap-4">
           {/* Theme Selector - Desktop */}
           <DropdownMenu>
-            <DropdownMenuTrigger asChild className="hidden md:flex">
-              <Button variant="outline" size="icon">
-                {theme === "light" && <Sun className="h-[1.2rem] w-[1.2rem]" />}
-                {theme === "dark" && <Moon className="h-[1.2rem] w-[1.2rem]" />}
-                {theme === "high-contrast" && <Zap className="h-[1.2rem] w-[1.2rem]" />}
-                <span className="sr-only">Cambiar tema</span>
-              </Button>
-            </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={() => setTheme("light")}>
                 <Sun className="mr-2 h-4 w-4" />
@@ -153,9 +145,13 @@ export default function Navbar() {
                     </div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => router.push("/perfil")}>
+                    <User className="mr-2 h-4 w-4" />
+                    <span>Mi Perfil</span>
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => router.push("/datos")}>
                     <Database className="mr-2 h-4 w-4" />
-                    <span>Mis Datos</span>
+                    <span>Actualizar Datos</span>
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => router.push("/objetivos")}>
                     <Target className="mr-2 h-4 w-4" />
@@ -293,6 +289,14 @@ export default function Navbar() {
 
                 {user ? (
                   <>
+                    <Link
+                      href="/perfil"
+                      className="flex items-center text-lg font-medium transition-colors hover:text-primary"
+                      onClick={() => setIsOpen(false)}
+                    >
+                      <User className="mr-2 h-4 w-4" />
+                      <span>Mi Perfil</span>
+                    </Link>
                     <Link
                       href="/datos"
                       className="flex items-center text-lg font-medium transition-colors hover:text-primary"

@@ -11,6 +11,27 @@ export type User = {
   blocked: boolean
   createdAt: string
   updatedAt: string
+  image?: string // Para la URL de la imagen de perfil de Google
+}
+
+export type DatoUsuario = {
+  id: number
+  edad: number
+  genero: "hombre" | "mujer"
+  peso: number
+  altura: number
+  nivelActividad: "bajo" | "medio" | "alto"
+  user?: User
+}
+
+export type Objetivo = {
+  id: number
+  entrenamientosSemanales: number
+  intensidad: string
+  pesoDeseado: number
+  fechaLimite: string
+  plan: string
+  user?: User
 }
 
 export type Alimento = {
@@ -38,6 +59,47 @@ export type Ejercicio = {
   createdAt: string
   updatedAt: string
   publishedAt?: string
+}
+
+export type EjercicioRutina = {
+  id: number
+  ejercicio: Ejercicio
+  series: number
+  repeticiones: number
+  peso: number
+  descanso: number
+  orden: number
+}
+
+export type Rutina = {
+  id: number
+  nombre: string
+  descripcion: string
+  diasSemana: string[] // ["lunes", "miercoles", "viernes"]
+  ejercicios: EjercicioRutina[]
+  createdAt: string
+  updatedAt: string
+  publishedAt?: string
+  user?: User
+}
+
+// Función para limpiar la URL de parámetros de autenticación
+export const cleanAuthParams = (): void => {
+  if (typeof window !== "undefined") {
+    const url = new URL(window.location.href)
+
+    // Verificar si hay parámetros de autenticación
+    if (url.searchParams.has("access_token") || url.searchParams.has("error")) {
+      // Eliminar los parámetros de la URL
+      url.searchParams.delete("access_token")
+      url.searchParams.delete("error")
+      url.searchParams.delete("code")
+      url.searchParams.delete("state")
+
+      // Reemplazar la URL actual sin recargar la página
+      window.history.replaceState({}, document.title, url.toString())
+    }
+  }
 }
 
 // Función para obtener el token de autenticación
@@ -78,6 +140,36 @@ export const getCurrentUser = async (): Promise<User | null> => {
     return response
   } catch (error) {
     console.error("Error al obtener el usuario actual:", error)
+    return null
+  }
+}
+
+// Función para obtener los datos del usuario
+export const getDatosUsuario = async (): Promise<DatoUsuario | null> => {
+  if (!isAuthenticated()) {
+    return null
+  }
+
+  try {
+    const response = await fetchAPI("/api/dato-usuarios/me")
+    return response.data
+  } catch (error) {
+    console.error("Error al obtener los datos del usuario:", error)
+    return null
+  }
+}
+
+// Función para obtener los objetivos del usuario
+export const getObjetivosUsuario = async (): Promise<Objetivo | null> => {
+  if (!isAuthenticated()) {
+    return null
+  }
+
+  try {
+    const response = await fetchAPI("/api/objetivos/me")
+    return response.data
+  } catch (error) {
+    console.error("Error al obtener los objetivos del usuario:", error)
     return null
   }
 }
@@ -174,6 +266,10 @@ export const handleOAuthCallback = async (queryParams: URLSearchParams): Promise
     if (accessToken) {
       // Guardar el token
       setAuthToken(accessToken)
+
+      // Limpiar la URL de parámetros de autenticación
+      cleanAuthParams()
+
       return { success: true }
     }
 
@@ -201,6 +297,75 @@ export const register = async (username: string, email: string, password: string
     return response
   } catch (error) {
     console.error("Error al registrar usuario:", error)
+    throw error
+  }
+}
+
+// Modificar la función forgotPassword para manejar mejor las respuestas
+export const forgotPassword = async (email: string): Promise<any> => {
+  try {
+    const url = `${API_URL}/api/auth/forgot-password`
+    console.log("URL de recuperación:", url)
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ email }),
+    })
+
+    console.log("Código de estado:", response.status)
+
+    // Verificar si la respuesta es exitosa
+    if (!response.ok) {
+      let errorMessage = `Error HTTP: ${response.status} ${response.statusText}`
+
+      // Manejar específicamente el error 500
+      if (response.status === 500) {
+        console.error("Error 500 del servidor. Posible problema con la configuración del correo en Strapi.")
+        throw new Error("Internal Server Error - El servidor no pudo procesar la solicitud")
+      }
+
+      try {
+        const errorData = await response.json()
+        errorMessage = errorData.error?.message || errorMessage
+      } catch (e) {
+        // Si no podemos parsear la respuesta como JSON, usamos el mensaje por defecto
+      }
+
+      throw new Error(errorMessage)
+    }
+
+    // Si la respuesta es exitosa pero no tiene cuerpo (204 No Content)
+    if (response.status === 204) {
+      return { ok: true }
+    }
+
+    // Si hay un cuerpo en la respuesta, devolverlo
+    const data = await response.json()
+    return data
+  } catch (error) {
+    console.error("Error al solicitar restablecimiento de contraseña:", error)
+    throw error
+  }
+}
+
+// Función para restablecer la contraseña
+export const resetPassword = async (code: string, password: string, passwordConfirmation: string): Promise<any> => {
+  try {
+    const response = await fetchAPI("/api/auth/reset-password", {
+      method: "POST",
+      body: JSON.stringify({
+        code,
+        password,
+        passwordConfirmation,
+      }),
+    })
+
+    return response
+  } catch (error) {
+    console.error("Error al restablecer la contraseña:", error)
     throw error
   }
 }
@@ -243,38 +408,47 @@ export const createAlimento = async (data: any): Promise<any> => {
 
 // Función para actualizar un alimento
 export const updateAlimento = async (id: number, data: any): Promise<any> => {
-  // Asegurarse de que estamos enviando solo los datos necesarios
-  const { nombre, calorias, proteinas, carbohidratos, grasas, fecha, tipo } = data
+  try {
+    // Asegurarse de que estamos enviando solo los datos necesarios
+    const { nombre, calorias, proteinas, carbohidratos, grasas, fecha, tipo } = data
 
-  const updateData = {
-    nombre,
-    calorias,
-    proteinas,
-    carbohidratos,
-    grasas,
-    fecha,
-    tipo,
+    const updateData = {
+      nombre,
+      calorias,
+      proteinas,
+      carbohidratos,
+      grasas,
+      fecha,
+      tipo,
+    }
+
+    const response = await fetchAPI(`/api/alimentos/${id}`, {
+      method: "PUT",
+      body: JSON.stringify({ data: updateData }),
+    })
+
+    // Verificar que la actualización fue exitosa
+    if (!response || !response.data) {
+      throw new Error("No se pudo actualizar el alimento")
+    }
+
+    return response
+  } catch (error) {
+    console.error("Error al actualizar alimento:", error)
+    throw error
   }
-
-  return fetchAPI(`/api/alimentos/${id}`, {
-    method: "PUT",
-    body: JSON.stringify({ data: updateData }),
-  })
 }
 
 // Función para eliminar un alimento
 export const deleteAlimento = async (id: number): Promise<any> => {
   try {
-    const response = await fetchAPI(`/api/alimentos/${id}`, {
+    await fetchAPI(`/api/alimentos/${id}`, {
       method: "DELETE",
     })
 
-    // Verificar que la eliminación fue exitosa
-    if (response) {
-      return { success: true, id }
-    } else {
-      throw new Error("No se pudo eliminar el alimento")
-    }
+    // En Strapi, una eliminación exitosa generalmente devuelve un 200 OK
+    // Si llegamos aquí, consideramos que la eliminación fue exitosa
+    return { success: true, id }
   } catch (error) {
     console.error("Error al eliminar alimento:", error)
     throw error
@@ -310,37 +484,46 @@ export const createEjercicio = async (data: any): Promise<any> => {
 
 // Función para actualizar un ejercicio
 export const updateEjercicio = async (id: number, data: any): Promise<any> => {
-  // Asegurarse de que estamos enviando solo los datos necesarios
-  const { nombre, series, repeticiones, peso, fecha, categoria } = data
+  try {
+    // Asegurarse de que estamos enviando solo los datos necesarios
+    const { nombre, series, repeticiones, peso, fecha, categoria } = data
 
-  const updateData = {
-    nombre,
-    series,
-    repeticiones,
-    peso,
-    fecha,
-    categoria,
+    const updateData = {
+      nombre,
+      series,
+      repeticiones,
+      peso,
+      fecha,
+      categoria,
+    }
+
+    const response = await fetchAPI(`/api/ejercicios/${id}`, {
+      method: "PUT",
+      body: JSON.stringify({ data: updateData }),
+    })
+
+    // Verificar que la actualización fue exitosa
+    if (!response || !response.data) {
+      throw new Error("No se pudo actualizar el ejercicio")
+    }
+
+    return response
+  } catch (error) {
+    console.error("Error al actualizar ejercicio:", error)
+    throw error
   }
-
-  return fetchAPI(`/api/ejercicios/${id}`, {
-    method: "PUT",
-    body: JSON.stringify({ data: updateData }),
-  })
 }
 
 // Función para eliminar un ejercicio
 export const deleteEjercicio = async (id: number): Promise<any> => {
   try {
-    const response = await fetchAPI(`/api/ejercicios/${id}`, {
+    await fetchAPI(`/api/ejercicios/${id}`, {
       method: "DELETE",
     })
 
-    // Verificar que la eliminación fue exitosa
-    if (response) {
-      return { success: true, id }
-    } else {
-      throw new Error("No se pudo eliminar el ejercicio")
-    }
+    // En Strapi, una eliminación exitosa generalmente devuelve un 200 OK
+    // Si llegamos aquí, consideramos que la eliminación fue exitosa
+    return { success: true, id }
   } catch (error) {
     console.error("Error al eliminar ejercicio:", error)
     throw error
@@ -436,3 +619,270 @@ export const obtenerRecomendacionesIMC = (imc: number): string => {
   }
 }
 
+// Función para guardar los datos de la calculadora IMC
+export const guardarCalculadoraIMC = async (datos: {
+  peso: number
+  altura: number
+  edad: number
+  genero: string
+  imc: number
+  categoria: string
+  fecha: string
+}): Promise<any> => {
+  try {
+    const response = await fetchAPI("/api/calculadora-imcs", {
+      method: "POST",
+      body: JSON.stringify({ data: datos }),
+    })
+
+    return response
+  } catch (error) {
+    console.error("Error al guardar datos de IMC:", error)
+    throw error
+  }
+}
+
+// Función para obtener el historial de la calculadora IMC
+export const getHistorialIMC = async (params: Record<string, any> = {}): Promise<any> => {
+  const queryParams = new URLSearchParams()
+
+  // Añadir parámetros a la URL
+  Object.entries(params).forEach(([key, value]) => {
+    queryParams.append(key, String(value))
+  })
+
+  // Añadir parámetros de ordenación
+  if (!params.sort) {
+    queryParams.append("sort", "fecha:desc")
+  }
+
+  const queryString = queryParams.toString() ? `?${queryParams.toString()}` : ""
+
+  return fetchAPI(`/api/calculadora-imcs${queryString}`)
+}
+
+// Función para actualizar el perfil del usuario
+export const updateUserProfile = async (data: {
+  username?: string
+  email?: string
+  password?: string
+  currentPassword?: string
+}): Promise<any> => {
+  try {
+    const response = await fetchAPI("/api/user/me", {
+      method: "PUT",
+      body: JSON.stringify(data),
+    })
+
+    return response
+  } catch (error) {
+    console.error("Error al actualizar perfil:", error)
+    throw error
+  }
+}
+
+// Función para guardar datos del usuario
+export const saveDatosUsuario = async (data: Partial<DatoUsuario>): Promise<any> => {
+  try {
+    // Verificar si el usuario ya tiene datos
+    const currentData = await getDatosUsuario()
+
+    if (currentData && currentData.id) {
+      // Actualizar datos existentes
+      const response = await fetchAPI(`/api/dato-usuarios/${currentData.id}`, {
+        method: "PUT",
+        body: JSON.stringify({ data }),
+      })
+      return response
+    } else {
+      // Crear nuevos datos
+      const response = await fetchAPI("/api/dato-usuarios", {
+        method: "POST",
+        body: JSON.stringify({ data }),
+      })
+      return response
+    }
+  } catch (error) {
+    console.error("Error al guardar datos del usuario:", error)
+    throw error
+  }
+}
+
+// Función para guardar objetivos del usuario
+export const saveObjetivosUsuario = async (data: Partial<Objetivo>): Promise<any> => {
+  try {
+    // Verificar si el usuario ya tiene objetivos
+    const currentData = await getObjetivosUsuario()
+
+    if (currentData && currentData.id) {
+      // Actualizar objetivos existentes
+      const response = await fetchAPI(`/api/objetivos/${currentData.id}`, {
+        method: "PUT",
+        body: JSON.stringify({ data }),
+      })
+      return response
+    } else {
+      // Crear nuevos objetivos
+      const response = await fetchAPI("/api/objetivos", {
+        method: "POST",
+        body: JSON.stringify({ data }),
+      })
+      return response
+    }
+  } catch (error) {
+    console.error("Error al guardar objetivos del usuario:", error)
+    throw error
+  }
+}
+
+// Función para obtener rutinas
+export const getRutinas = async (params: Record<string, any> = {}): Promise<any> => {
+  const queryParams = new URLSearchParams()
+
+  // Añadir parámetros a la URL
+  Object.entries(params).forEach(([key, value]) => {
+    queryParams.append(key, String(value))
+  })
+
+  const queryString = queryParams.toString() ? `?${queryParams.toString()}` : ""
+
+  return fetchAPI(`/api/rutinas${queryString}`)
+}
+
+// Función para obtener una rutina por ID
+export const getRutina = async (id: number): Promise<any> => {
+  return fetchAPI(`/api/rutinas/${id}`)
+}
+
+// Función para crear una rutina
+export const createRutina = async (data: any): Promise<any> => {
+  return fetchAPI("/api/rutinas", {
+    method: "POST",
+    body: JSON.stringify({ data }),
+  })
+}
+
+// Función para actualizar una rutina
+export const updateRutina = async (id: number, data: any): Promise<any> => {
+  try {
+    const response = await fetchAPI(`/api/rutinas/${id}`, {
+      method: "PUT",
+      body: JSON.stringify({ data }),
+    })
+
+    // Verificar que la actualización fue exitosa
+    if (!response || !response.data) {
+      throw new Error("No se pudo actualizar la rutina")
+    }
+
+    return response
+  } catch (error) {
+    console.error("Error al actualizar rutina:", error)
+    throw error
+  }
+}
+
+// Función para eliminar una rutina
+export const deleteRutina = async (id: number): Promise<any> => {
+  try {
+    await fetchAPI(`/api/rutinas/${id}`, {
+      method: "DELETE",
+    })
+
+    // En Strapi, una eliminación exitosa generalmente devuelve un 200 OK
+    // Si llegamos aquí, consideramos que la eliminación fue exitosa
+    return { success: true, id }
+  } catch (error) {
+    console.error("Error al eliminar rutina:", error)
+    throw error
+  }
+}
+
+// Función para añadir un ejercicio a una rutina
+export const addEjercicioToRutina = async (
+  rutinaId: number,
+  ejercicioId: number,
+  series: number,
+  repeticiones: number,
+  peso: number,
+  descanso: number,
+  orden: number,
+): Promise<any> => {
+  try {
+    // Primero obtenemos la rutina actual
+    const rutina = await getRutina(rutinaId)
+
+    // Creamos el nuevo ejercicio para la rutina
+    const nuevoEjercicio = {
+      ejercicio: ejercicioId,
+      series,
+      repeticiones,
+      peso,
+      descanso,
+      orden,
+    }
+
+    // Añadimos el ejercicio a la lista de ejercicios de la rutina
+    const ejerciciosActualizados = [...(rutina.data.ejercicios || []), nuevoEjercicio]
+
+    // Actualizamos la rutina con la nueva lista de ejercicios
+    return updateRutina(rutinaId, { ejercicios: ejerciciosActualizados })
+  } catch (error) {
+    console.error("Error al añadir ejercicio a la rutina:", error)
+    throw error
+  }
+}
+
+// Función para eliminar un ejercicio de una rutina
+export const removeEjercicioFromRutina = async (rutinaId: number, ejercicioIndex: number): Promise<any> => {
+  try {
+    // Primero obtenemos la rutina actual
+    const rutina = await getRutina(rutinaId)
+
+    // Filtramos el ejercicio que queremos eliminar
+    const ejerciciosActualizados = rutina.data.ejercicios.filter((_: any, index: number) => index !== ejercicioIndex)
+
+    // Actualizamos la rutina con la nueva lista de ejercicios
+    return updateRutina(rutinaId, { ejercicios: ejerciciosActualizados })
+  } catch (error) {
+    console.error("Error al eliminar ejercicio de la rutina:", error)
+    throw error
+  }
+}
+
+// Función para verificar si un usuario es premium
+export const isPremiumUser = async (): Promise<boolean> => {
+  try {
+    if (!isAuthenticated()) {
+      return false
+    }
+
+    const user = await getCurrentUser()
+
+    // Aquí implementamos la lógica para determinar si un usuario es premium
+    // Por ejemplo, podría ser un campo en el perfil del usuario
+    // Por ahora, simulamos que todos los usuarios autenticados son premium
+    return true
+  } catch (error) {
+    console.error("Error al verificar si el usuario es premium:", error)
+    return false
+  }
+}
+
+// Función para verificar si un usuario tiene acceso a una funcionalidad premium
+export const checkPremiumAccess = async (redirectIfNotPremium = true): Promise<boolean> => {
+  try {
+    const isPremium = await isPremiumUser()
+
+    if (!isPremium && redirectIfNotPremium && typeof window !== "undefined") {
+      // Redirigir a la página de planes premium
+      window.location.href = "/planes"
+      return false
+    }
+
+    return isPremium
+  } catch (error) {
+    console.error("Error al verificar acceso premium:", error)
+    return false
+  }
+}

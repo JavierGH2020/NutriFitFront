@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Calendar, ChevronLeft, ChevronRight, Utensils, Dumbbell, Loader2 } from "lucide-react"
+import { Calendar, ChevronLeft, ChevronRight, Utensils, Dumbbell, Loader2, Calculator } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -11,7 +11,13 @@ import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { format, subDays, startOfMonth, endOfMonth, subMonths, subYears } from "date-fns"
 import { es } from "date-fns/locale"
-import { getHistorialAlimentos, getHistorialEjercicios, type Alimento, type Ejercicio } from "@/lib/api"
+import {
+  getHistorialAlimentos,
+  getHistorialEjercicios,
+  getHistorialIMC,
+  type Alimento,
+  type Ejercicio,
+} from "@/lib/api"
 import AuthGuard from "@/components/auth-guard"
 
 type AlimentoHistorial = {
@@ -22,6 +28,17 @@ type AlimentoHistorial = {
 type EjercicioHistorial = {
   fecha: string
   ejercicios: Ejercicio[]
+}
+
+type IMCHistorial = {
+  id: number
+  peso: number
+  altura: number
+  edad: number
+  genero: string
+  imc: number
+  categoria: string
+  fecha: string
 }
 
 // Función para agrupar alimentos por fecha
@@ -74,8 +91,10 @@ export default function HistorialPage() {
   const [añoActual, setAñoActual] = useState(new Date().getFullYear())
   const [alimentosHistorial, setAlimentosHistorial] = useState<AlimentoHistorial[]>([])
   const [ejerciciosHistorial, setEjerciciosHistorial] = useState<EjercicioHistorial[]>([])
+  const [imcHistorial, setImcHistorial] = useState<IMCHistorial[]>([])
   const [isLoadingAlimentos, setIsLoadingAlimentos] = useState(true)
   const [isLoadingEjercicios, setIsLoadingEjercicios] = useState(true)
+  const [isLoadingIMC, setIsLoadingIMC] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   // Cargar historial al montar el componente o cambiar filtros
@@ -87,6 +106,7 @@ export default function HistorialPage() {
   const fetchHistorial = async () => {
     setIsLoadingAlimentos(true)
     setIsLoadingEjercicios(true)
+    setIsLoadingIMC(true)
     setError(null)
 
     // Calcular fechas para filtrar según el periodo seleccionado
@@ -121,6 +141,7 @@ export default function HistorialPage() {
       const alimentosResponse = await getHistorialAlimentos(alimentosParams)
       const alimentosAgrupados = agruparAlimentosPorFecha(alimentosResponse.data || [])
       setAlimentosHistorial(alimentosAgrupados)
+      setIsLoadingAlimentos(false)
 
       // Obtener historial de ejercicios
       const ejerciciosParams = {
@@ -132,12 +153,24 @@ export default function HistorialPage() {
       const ejerciciosResponse = await getHistorialEjercicios(ejerciciosParams)
       const ejerciciosAgrupados = agruparEjerciciosPorFecha(ejerciciosResponse.data || [])
       setEjerciciosHistorial(ejerciciosAgrupados)
+      setIsLoadingEjercicios(false)
+
+      // Obtener historial de IMC
+      const imcParams = {
+        "filters[fecha][$gte]": fechaInicio,
+        "filters[fecha][$lte]": fechaFin,
+        sort: "fecha:desc",
+      }
+
+      const imcResponse = await getHistorialIMC(imcParams)
+      setImcHistorial(imcResponse.data || [])
+      setIsLoadingIMC(false)
     } catch (err) {
       setError("Error al cargar el historial. Por favor, inténtalo de nuevo.")
       console.error(err)
-    } finally {
       setIsLoadingAlimentos(false)
       setIsLoadingEjercicios(false)
+      setIsLoadingIMC(false)
     }
   }
 
@@ -151,11 +184,17 @@ export default function HistorialPage() {
   const calcularTotalesDia = (alimentos: Alimento[]) => {
     return alimentos.reduce(
       (acc, alimento) => {
+        // Convertir explícitamente a números para evitar concatenación de strings
+        const calorias = Number(alimento.calorias || 0)
+        const proteinas = Number(alimento.proteinas || 0)
+        const carbohidratos = Number(alimento.carbohidratos || 0)
+        const grasas = Number(alimento.grasas || 0)
+
         return {
-          calorias: acc.calorias + (alimento.calorias || 0),
-          proteinas: acc.proteinas + (alimento.proteinas || 0),
-          carbohidratos: acc.carbohidratos + (alimento.carbohidratos || 0),
-          grasas: acc.grasas + (alimento.grasas || 0),
+          calorias: acc.calorias + calorias,
+          proteinas: acc.proteinas + proteinas,
+          carbohidratos: acc.carbohidratos + carbohidratos,
+          grasas: acc.grasas + grasas,
         }
       },
       { calorias: 0, proteinas: 0, carbohidratos: 0, grasas: 0 },
@@ -227,7 +266,7 @@ export default function HistorialPage() {
         </div>
 
         <Tabs defaultValue="alimentos" className="mt-6">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="alimentos" className="flex items-center gap-2">
               <Utensils className="h-4 w-4" />
               Alimentos
@@ -235,6 +274,10 @@ export default function HistorialPage() {
             <TabsTrigger value="ejercicios" className="flex items-center gap-2">
               <Dumbbell className="h-4 w-4" />
               Ejercicios
+            </TabsTrigger>
+            <TabsTrigger value="imc" className="flex items-center gap-2">
+              <Calculator className="h-4 w-4" />
+              IMC
             </TabsTrigger>
           </TabsList>
 
@@ -386,6 +429,70 @@ export default function HistorialPage() {
                             </div>
                           )
                         })}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </TabsContent>
+
+          {/* Historial de IMC */}
+          <TabsContent value="imc">
+            {isLoadingIMC ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-primary mr-2" />
+                <p>Cargando historial de IMC...</p>
+              </div>
+            ) : imcHistorial.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-muted-foreground">No hay registros de IMC para este periodo.</p>
+              </div>
+            ) : (
+              <div className="grid gap-6">
+                {imcHistorial.map((registro) => (
+                  <Card key={registro.id}>
+                    <CardHeader className="pb-2">
+                      <div className="flex items-center justify-between">
+                        <CardTitle>{formatearFecha(registro.fecha)}</CardTitle>
+                        <Badge
+                          variant={
+                            registro.categoria.includes("normal")
+                              ? "outline"
+                              : registro.categoria.includes("Bajo")
+                                ? "secondary"
+                                : "destructive"
+                          }
+                        >
+                          {registro.categoria}
+                        </Badge>
+                      </div>
+                      <CardDescription>Registro de IMC</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex flex-col items-center justify-center space-y-2 rounded-lg bg-muted p-6 text-center mb-4">
+                        <span className="text-sm font-medium">Tu IMC fue</span>
+                        <span className="text-4xl font-bold">{registro.imc}</span>
+                        <span className="text-lg font-semibold text-primary">{registro.categoria}</span>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+                        <div className="rounded-lg border p-3">
+                          <div className="text-sm text-muted-foreground">Peso</div>
+                          <div className="text-lg font-semibold">{registro.peso} kg</div>
+                        </div>
+                        <div className="rounded-lg border p-3">
+                          <div className="text-sm text-muted-foreground">Altura</div>
+                          <div className="text-lg font-semibold">{registro.altura} cm</div>
+                        </div>
+                        <div className="rounded-lg border p-3">
+                          <div className="text-sm text-muted-foreground">Edad</div>
+                          <div className="text-lg font-semibold">{registro.edad} años</div>
+                        </div>
+                        <div className="rounded-lg border p-3">
+                          <div className="text-sm text-muted-foreground">Género</div>
+                          <div className="text-lg font-semibold capitalize">{registro.genero}</div>
+                        </div>
                       </div>
                     </CardContent>
                   </Card>

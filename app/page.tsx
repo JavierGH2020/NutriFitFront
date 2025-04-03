@@ -7,13 +7,13 @@ export default function Home() {
   return (
     <div>
       {/* Hero Section */}
-      <section className="relative">
+      <section className="relative bg-gradient-to-b from-primary/10 to-background">
         <div className="container flex flex-col items-center justify-center gap-4 py-12 text-center md:py-24">
           <h1 className="text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl">
             Transforma tu cuerpo, transforma tu vida
           </h1>
           <p className="max-w-[700px] text-muted-foreground md:text-xl">
-            FitTrack te ayuda a registrar tus comidas, seguir tus entrenamientos y monitorear tu progreso para alcanzar
+            NutriFit te ayuda a registrar tus comidas, seguir tus entrenamientos y monitorear tu progreso para alcanzar
             tus metas fitness.
           </p>
           <div className="flex flex-col gap-2 min-[400px]:flex-row">
@@ -21,7 +21,7 @@ export default function Home() {
               <Link href="/alimentos">Comenzar ahora</Link>
             </Button>
             <Button size="lg" variant="outline" asChild>
-              <Link href="/calculadora-imc">Calcular IMC</Link>
+              <Link href="/calculadora">Calcular IMC</Link>
             </Button>
           </div>
         </div>
@@ -30,7 +30,7 @@ export default function Home() {
       {/* Features Section */}
       <section className="container py-12 md:py-24">
         <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-          <Card>
+          <Card className="border-primary/20 hover:border-primary/50 transition-colors">
             <CardHeader>
               <Utensils className="h-10 w-10 text-primary" />
               <CardTitle className="mt-4">Registro de Alimentos</CardTitle>
@@ -39,14 +39,14 @@ export default function Home() {
               </CardDescription>
             </CardHeader>
             <CardFooter>
-              <Button variant="ghost" className="w-full" asChild>
+              <Button variant="ghost" className="w-full group" asChild>
                 <Link href="/alimentos" className="flex items-center justify-center gap-2">
-                  Explorar <ArrowRight className="h-4 w-4" />
+                  Explorar <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
                 </Link>
               </Button>
             </CardFooter>
           </Card>
-          <Card>
+          <Card className="border-primary/20 hover:border-primary/50 transition-colors">
             <CardHeader>
               <Dumbbell className="h-10 w-10 text-primary" />
               <CardTitle className="mt-4">Registro de Entrenos</CardTitle>
@@ -55,14 +55,14 @@ export default function Home() {
               </CardDescription>
             </CardHeader>
             <CardFooter>
-              <Button variant="ghost" className="w-full" asChild>
-                <Link href="/entrenos" className="flex items-center justify-center gap-2">
-                  Explorar <ArrowRight className="h-4 w-4" />
+              <Button variant="ghost" className="w-full group" asChild>
+                <Link href="/ejercicios" className="flex items-center justify-center gap-2">
+                  Explorar <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
                 </Link>
               </Button>
             </CardFooter>
           </Card>
-          <Card>
+          <Card className="border-primary/20 hover:border-primary/50 transition-colors">
             <CardHeader>
               <Calculator className="h-10 w-10 text-primary" />
               <CardTitle className="mt-4">Calculadora IMC</CardTitle>
@@ -71,9 +71,9 @@ export default function Home() {
               </CardDescription>
             </CardHeader>
             <CardFooter>
-              <Button variant="ghost" className="w-full" asChild>
+              <Button variant="ghost" className="w-full group" asChild>
                 <Link href="/calculadora" className="flex items-center justify-center gap-2">
-                  Calcular <ArrowRight className="h-4 w-4" />
+                  Calcular <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
                 </Link>
               </Button>
             </CardFooter>
@@ -88,14 +88,16 @@ export default function Home() {
             Lo que dicen nuestros usuarios
           </h2>
           <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-            <Card>
+            <Card className="bg-card/50 backdrop-blur">
               <CardContent className="pt-6">
                 <p className="mb-4 italic">
-                  "FitTrack me ha ayudado a mantener un registro de mis comidas y entrenamientos. He perdido 10kg en 3
+                  "NutriFit me ha ayudado a mantener un registro de mis comidas y entrenamientos. He perdido 10kg en 3
                   meses."
                 </p>
                 <div className="flex items-center gap-4">
-                  <div className="h-10 w-10 rounded-full bg-primary" />
+                  <div className="h-10 w-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold">
+                    MG
+                  </div>
                   <div>
                     <p className="font-medium">María García</p>
                     <p className="text-sm text-muted-foreground">Miembro desde 2022</p>
@@ -103,13 +105,15 @@ export default function Home() {
                 </div>
               </CardContent>
             </Card>
-            <Card>
+            <Card className="bg-card/50 backdrop-blur">
               <CardContent className="pt-6">
                 <p className="mb-4 italic">
                   "La calculadora de IMC me dio una visión clara de mi estado físico actual y qué necesito mejorar."
                 </p>
                 <div className="flex items-center gap-4">
-                  <div className="h-10 w-10 rounded-full bg-primary" />
+                  <div className="h-10 w-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold">
+                    CR
+                  </div>
                   <div>
                     <p className="font-medium">Carlos Rodríguez</p>
                     <p className="text-sm text-muted-foreground">Miembro desde 2023</p>
@@ -117,14 +121,16 @@ export default function Home() {
                 </div>
               </CardContent>
             </Card>
-            <Card>
+            <Card className="bg-card/50 backdrop-blur">
               <CardContent className="pt-6">
                 <p className="mb-4 italic">
-                  "Gracias a FitTrack he podido organizar mis rutinas de entrenamiento y ver mi progreso semana a
+                  "Gracias a NutriFit he podido organizar mis rutinas de entrenamiento y ver mi progreso semana a
                   semana."
                 </p>
                 <div className="flex items-center gap-4">
-                  <div className="h-10 w-10 rounded-full bg-primary" />
+                  <div className="h-10 w-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold">
+                    LM
+                  </div>
                   <div>
                     <p className="font-medium">Laura Martínez</p>
                     <p className="text-sm text-muted-foreground">Miembro desde 2021</p>
