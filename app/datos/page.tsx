@@ -4,7 +4,7 @@ import type React from "react"
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { Database, Save, Loader2 } from "lucide-react"
+import { Database, Save, Loader2, AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -12,15 +12,18 @@ import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { getDatosUsuario, type DatoUsuario } from "@/lib/api"
+import { getDatosUsuario, saveDatosUsuario, type DatoUsuario } from "@/lib/api"
 import AuthGuard from "@/components/auth-guard"
+import { useToast } from "@/hooks/use-toast"
 
 export default function DatosPage() {
   const router = useRouter()
+  const { toast } = useToast()
   const [datos, setDatos] = useState<DatoUsuario | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
 
   // Formulario
   const [formData, setFormData] = useState({
@@ -35,6 +38,7 @@ export default function DatosPage() {
   useEffect(() => {
     const fetchDatos = async () => {
       setIsLoading(true)
+      setError(null)
       try {
         const datosUsuario = await getDatosUsuario()
         setDatos(datosUsuario)
@@ -77,24 +81,34 @@ export default function DatosPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
+    setSuccess(null)
     setIsSaving(true)
 
     try {
-      // Aquí iría la lógica para guardar los datos
-      // Por ahora solo simulamos un retraso
-      await new Promise((resolve) => setTimeout(resolve, 1000))
+      // Validar datos
+      if (formData.edad < 0 || formData.peso <= 0 || formData.altura <= 0) {
+        throw new Error("Por favor, introduce valores válidos para edad, peso y altura.")
+      }
 
-      // Actualizar los datos locales
+      // Guardar datos
+      const response = await saveDatosUsuario(formData)
+
+      // Actualizar datos locales
       setDatos({
         ...datos,
         ...formData,
-        id: datos?.id || 0,
+        id: datos?.id || response.data.id,
       } as DatoUsuario)
 
-      // Mostrar mensaje de éxito o redirigir
-    } catch (err) {
+      setSuccess("Datos guardados correctamente")
+
+      toast({
+        title: "Datos guardados",
+        description: "Tus datos personales se han guardado correctamente.",
+      })
+    } catch (err: any) {
       console.error("Error al guardar datos:", err)
-      setError("No se pudieron guardar tus datos. Por favor, inténtalo de nuevo.")
+      setError(err.message || "No se pudieron guardar tus datos. Por favor, inténtalo de nuevo.")
     } finally {
       setIsSaving(false)
     }
@@ -107,7 +121,14 @@ export default function DatosPage() {
 
         {error && (
           <Alert variant="destructive" className="mb-4">
+            <AlertCircle className="h-4 w-4" />
             <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+
+        {success && (
+          <Alert className="mb-4 bg-green-50 text-green-800 border-green-200">
+            <AlertDescription>{success}</AlertDescription>
           </Alert>
         )}
 

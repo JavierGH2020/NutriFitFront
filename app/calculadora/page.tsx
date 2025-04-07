@@ -75,8 +75,7 @@ export default function CalculadoraIMCPage() {
         edad: edadNum,
         genero,
         imc,
-        categoria,
-        fecha: new Date().toISOString().split("T")[0],
+        categoria
       })
 
       toast({
