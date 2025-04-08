@@ -6,7 +6,7 @@ import { Check, Sparkles, Loader2, AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { updateUserRole, getCurrentUser, isPremiumUser } from "@/lib/api"
+import { updateUserProfile, getCurrentUser, isPremiumUser } from "@/lib/api"
 import AuthGuard from "@/components/auth-guard"
 import { useToast } from "@/hooks/use-toast"
 
@@ -52,7 +52,7 @@ export default function PlanesPage() {
       }
 
       // Actualizar el rol del usuario a premium
-      await updateUserRole(user.id, "premium")
+      await updateUserProfile({ id: user.id, role: "authenticated" })
 
       setSuccess(
         `¡Felicidades! Tu cuenta ha sido actualizada al plan ${plan === "premium" ? "Premium" : "Premium Anual"}.`,

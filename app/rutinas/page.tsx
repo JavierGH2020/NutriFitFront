@@ -180,7 +180,6 @@ export default function RutinasPage() {
     }
   }
 
-  // Reemplazar la función handleSubmit con esta versión mejorada
   const handleSubmit = async () => {
     if (!nuevaRutina.nombre) {
       setError("El nombre de la rutina es obligatorio")
@@ -231,6 +230,7 @@ export default function RutinasPage() {
       }
     } catch (err: any) {
       console.error("Error al crear rutina:", err)
+      // Mostrar un mensaje de error más descriptivo
       setError(`Error al crear la rutina: ${err.message || "Por favor, inténtalo de nuevo."}`)
     } finally {
       setIsSaving(false)
@@ -329,9 +329,7 @@ export default function RutinasPage() {
     setError(null)
 
     try {
-      // Calcular el orden (último + 1)
-      const orden = rutinaSeleccionada.ejercicios ? rutinaSeleccionada.ejercicios.length + 1 : 1
-
+      // Con la nueva estructura de relación, solo necesitamos pasar el ID del ejercicio
       const response = await addEjercicioToRutina(
         rutinaSeleccionada.id,
         nuevoEjercicioRutina.ejercicioId,
@@ -339,7 +337,7 @@ export default function RutinasPage() {
         nuevoEjercicioRutina.repeticiones,
         nuevoEjercicioRutina.peso,
         nuevoEjercicioRutina.descanso,
-        orden,
+        0, // El orden ya no es necesario con la relación directa
       )
 
       // Actualizar la rutina seleccionada con los nuevos datos
@@ -397,34 +395,16 @@ export default function RutinasPage() {
     // No se puede mover hacia abajo si es el último elemento
     if (direction === "down" && index === rutinaSeleccionada.ejercicios.length - 1) return
 
-    // Crear una copia de los ejercicios
-    const ejerciciosActualizados = [...rutinaSeleccionada.ejercicios]
+    // Con la nueva estructura de relación, no podemos reordenar directamente
+    // Necesitamos usar el endpoint de Strapi para actualizar el orden
 
-    // Intercambiar posiciones
-    const newIndex = direction === "up" ? index - 1 : index + 1
-    const temp = ejerciciosActualizados[index]
-    ejerciciosActualizados[index] = ejerciciosActualizados[newIndex]
-    ejerciciosActualizados[newIndex] = temp
+    // Por ahora, mostramos un mensaje de que esta funcionalidad no está disponible
+    setError(
+      "La funcionalidad de reordenar ejercicios no está disponible con la nueva estructura de datos. Estamos trabajando en ello.",
+    )
 
-    // Actualizar órdenes
-    ejerciciosActualizados.forEach((ejercicio, i) => {
-      ejercicio.orden = i + 1
-    })
-
-    try {
-      const response = await updateRutina(rutinaSeleccionada.id, {
-        ejercicios: ejerciciosActualizados,
-      })
-
-      // Actualizar la rutina seleccionada con los nuevos datos
-      setRutinaSeleccionada(response.data)
-
-      // Actualizar la lista de rutinas
-      setRutinas(rutinas.map((rutina) => (rutina.id === rutinaSeleccionada.id ? response.data : rutina)))
-    } catch (err) {
-      setError("Error al reordenar los ejercicios. Por favor, inténtalo de nuevo.")
-      console.error(err)
-    }
+    // Alternativa: Eliminar y volver a añadir los ejercicios en el orden deseado
+    // Esto requeriría implementación adicional
   }
 
   const filteredRutinas = rutinas.filter((rutina) => rutina.nombre.toLowerCase().includes(searchTerm.toLowerCase()))
@@ -723,9 +703,8 @@ export default function RutinasPage() {
                         {filteredRutinas.map((rutina) => (
                           <div
                             key={rutina.id}
-                            className={`p-4 cursor-pointer hover:bg-muted transition-colors ${
-                              rutinaSeleccionada?.id === rutina.id ? "bg-muted" : ""
-                            }`}
+                            className={`p-4 cursor-pointer hover:bg-muted transition-colors ${rutinaSeleccionada?.id === rutina.id ? "bg-muted" : ""
+                              }`}
                             onClick={() => handleSelectRutina(rutina)}
                           >
                             <div className="flex justify-between items-start">
@@ -735,11 +714,20 @@ export default function RutinasPage() {
                                   {rutina.descripcion || "Sin descripción"}
                                 </p>
                                 <div className="flex flex-wrap gap-1 mt-2">
-                                  {(rutina.diasSemana || []).map((dia) => (
-                                    <Badge key={dia} variant="outline" className="text-xs">
-                                      {diasSemana.find((d) => d.id === dia)?.label || dia}
-                                    </Badge>
-                                  ))}
+                                  {Array.isArray(rutina.diasSemana)
+                                    ? rutina.diasSemana.map((dia) => (
+                                      <Badge key={dia} variant="outline" className="text-xs">
+                                        {diasSemana.find((d) => d.id === dia)?.label || dia}
+                                      </Badge>
+                                    ))
+                                    : rutina.diasSemana && (
+                                      <Badge variant="outline" className="text-xs">
+                                        {(Array.isArray(rutina.diasSemana) ? rutina.diasSemana : [rutina.diasSemana])
+                                          .map((dia) => diasSemana.find((d) => d.id === dia)?.label || dia)
+                                          .join(", ")}
+                                      </Badge>
+                                    )}
+
                                 </div>
                               </div>
                               <div className="flex gap-1">
@@ -783,11 +771,11 @@ export default function RutinasPage() {
                           <CardTitle>{rutinaSeleccionada.nombre}</CardTitle>
                           <CardDescription>{rutinaSeleccionada.descripcion || "Sin descripción"}</CardDescription>
                           <div className="flex flex-wrap gap-1 mt-2">
-                            {(rutinaSeleccionada.diasSemana || []).map((dia) => (
+                            {Array.isArray(rutinaSeleccionada.diasSemana) ? rutinaSeleccionada.diasSemana.map((dia) => (
                               <Badge key={dia} variant="outline">
                                 {diasSemana.find((d) => d.id === dia)?.label || dia}
                               </Badge>
-                            ))}
+                            )) : null}
                           </div>
                         </div>
                         <Button onClick={handleAddEjercicio}>
@@ -819,67 +807,62 @@ export default function RutinasPage() {
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {rutinaSeleccionada.ejercicios.map((ejercicio, index) => {
-                              // Buscar el ejercicio completo si solo tenemos el ID
-                              const ejercicioCompleto =
-                                typeof ejercicio === "number" || typeof ejercicio.id === "number"
-                                  ? ejercicios.find(
-                                      (e) => e.id === (typeof ejercicio === "number" ? ejercicio : ejercicio.id),
-                                    )
-                                  : ejercicio
-
-                              return (
-                                <TableRow key={index}>
-                                  <TableCell className="font-medium">
-                                    <div className="flex flex-col items-center">
-                                      <span>{ejercicio.orden || index + 1}</span>
-                                      <div className="flex flex-col mt-1">
-                                        <Button
-                                          variant="ghost"
-                                          size="icon"
-                                          className="h-5 w-5"
-                                          onClick={() => handleMoveEjercicio(index, "up")}
-                                          disabled={index === 0}
-                                        >
-                                          <ArrowUp className="h-3 w-3" />
-                                        </Button>
-                                        <Button
-                                          variant="ghost"
-                                          size="icon"
-                                          className="h-5 w-5"
-                                          onClick={() => handleMoveEjercicio(index, "down")}
-                                          disabled={index === rutinaSeleccionada.ejercicios.length - 1}
-                                        >
-                                          <ArrowDown className="h-3 w-3" />
-                                        </Button>
+                            {rutinaSeleccionada.ejercicios &&
+                              rutinaSeleccionada.ejercicios.map((ejercicio, index) => {
+                                // Con la nueva estructura de relación, ejercicio es un objeto completo
+                                // No necesitamos buscar el ejercicio completo
+                                return (
+                                  <TableRow key={index}>
+                                    <TableCell className="font-medium">
+                                      <div className="flex flex-col items-center">
+                                        <span>{index + 1}</span>
+                                        <div className="flex flex-col mt-1">
+                                          <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-5 w-5"
+                                            onClick={() => handleMoveEjercicio(index, "up")}
+                                            disabled={index === 0}
+                                          >
+                                            <ArrowUp className="h-3 w-3" />
+                                          </Button>
+                                          <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-5 w-5"
+                                            onClick={() => handleMoveEjercicio(index, "down")}
+                                            disabled={index === rutinaSeleccionada.ejercicios.length - 1}
+                                          >
+                                            <ArrowDown className="h-3 w-3" />
+                                          </Button>
+                                        </div>
                                       </div>
-                                    </div>
-                                  </TableCell>
-                                  <TableCell>
-                                    <div>
-                                      <span className="font-medium">{ejercicioCompleto?.nombre || "Ejercicio"}</span>
-                                      <p className="text-xs text-muted-foreground capitalize">
-                                        {ejercicioCompleto?.categoria || "Sin categoría"}
-                                      </p>
-                                    </div>
-                                  </TableCell>
-                                  <TableCell className="text-center">{ejercicio.series}</TableCell>
-                                  <TableCell className="text-center">{ejercicio.repeticiones}</TableCell>
-                                  <TableCell className="text-center">{ejercicio.peso} kg</TableCell>
-                                  <TableCell className="text-center">
-                                    <div className="flex items-center justify-center gap-1">
-                                      <Clock className="h-3 w-3 text-muted-foreground" />
-                                      <span>{ejercicio.descanso}s</span>
-                                    </div>
-                                  </TableCell>
-                                  <TableCell className="text-right">
-                                    <Button variant="ghost" size="icon" onClick={() => handleRemoveEjercicio(index)}>
-                                      <Trash className="h-4 w-4" />
-                                    </Button>
-                                  </TableCell>
-                                </TableRow>
-                              )
-                            })}
+                                    </TableCell>
+                                    <TableCell>
+                                      <div>
+                                        <span className="font-medium">{ejercicio.nombre || "Ejercicio"}</span>
+                                        <p className="text-xs text-muted-foreground capitalize">
+                                          {ejercicio.categoria || "Sin categoría"}
+                                        </p>
+                                      </div>
+                                    </TableCell>
+                                    <TableCell className="text-center">{ejercicio.series || 3}</TableCell>
+                                    <TableCell className="text-center">{ejercicio.repeticiones || 10}</TableCell>
+                                    <TableCell className="text-center">{ejercicio.peso || 0} kg</TableCell>
+                                    <TableCell className="text-center">
+                                      <div className="flex items-center justify-center gap-1">
+                                        <Clock className="h-3 w-3 text-muted-foreground" />
+                                        <span>{ejercicio.descanso || 60}s</span>
+                                      </div>
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                      <Button variant="ghost" size="icon" onClick={() => handleRemoveEjercicio(index)}>
+                                        <Trash className="h-4 w-4" />
+                                      </Button>
+                                    </TableCell>
+                                  </TableRow>
+                                )
+                              })}
                           </TableBody>
                         </Table>
                       )}

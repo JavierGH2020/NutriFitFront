@@ -5,13 +5,16 @@ import type React from "react"
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { Apple, Eye, EyeOff, AlertCircle, Loader2 } from "lucide-react"
+import { Apple, Eye, EyeOff, AlertCircle, Loader2, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { register, isAuthenticated } from "@/lib/api"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+// Actualizar la importación para obtener register desde auth.ts
+import { register} from "@/lib/auth"
+import { isAuthenticated } from "@/lib/api"
 
 export default function RegisterPage() {
   const router = useRouter()
@@ -20,6 +23,7 @@ export default function RegisterPage() {
     email: "",
     password: "",
     confirmPassword: "",
+    role: "public" as "public" | "premium",
   })
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
@@ -60,11 +64,11 @@ export default function RegisterPage() {
     setIsLoading(true)
 
     try {
-      // Registrar usuario en Strapi
-      await register(formData.username, formData.email, formData.password)
+      // Registrar usuario en Strapi con el rol seleccionado
+      await register(formData.username, formData.email, formData.password, formData.role)
 
       // Redirigir al usuario a la página principal
-      router.push("/")
+      router.push("/login")
     } catch (err: any) {
       console.error("Error de registro:", err)
 
@@ -194,6 +198,43 @@ export default function RegisterPage() {
                 </Button>
               </div>
             </div>
+
+            <div className="space-y-2">
+              <Label>Tipo de cuenta</Label>
+              <Tabs
+                defaultValue="public"
+                className="w-full"
+                onValueChange={(value) => setFormData({ ...formData, role: value as "public" | "premium" })}
+              >
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="public">Básica (Gratis)</TabsTrigger>
+                  <TabsTrigger value="premium">Premium</TabsTrigger>
+                </TabsList>
+                <TabsContent value="public" className="mt-2 rounded-md border p-3">
+                  <div className="flex items-start gap-2">
+                    <div>
+                      <h4 className="font-medium">Cuenta Básica</h4>
+                      <p className="text-sm text-muted-foreground">
+                        Acceso a funciones básicas: registro de alimentos y ejercicios.
+                      </p>
+                    </div>
+                  </div>
+                </TabsContent>
+                <TabsContent value="premium" className="mt-2 rounded-md border border-primary/50 bg-primary/5 p-3">
+                  <div className="flex items-start gap-2">
+                    <Sparkles className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
+                    <div>
+                      <h4 className="font-medium">Cuenta Premium</h4>
+                      <p className="text-sm text-muted-foreground">
+                        Acceso completo a todas las funcionalidades, incluyendo rutinas personalizadas y estadísticas
+                        avanzadas.
+                      </p>
+                    </div>
+                  </div>
+                </TabsContent>
+              </Tabs>
+            </div>
+
             <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? (
                 <>

@@ -244,8 +244,8 @@ export default function PerfilPage() {
                 <CardHeader>
                   <div className="flex flex-col items-center">
                     <Avatar className="h-24 w-24 mb-4">
-                      {isGoogleUser && user?.image ? (
-                        <AvatarImage src={user.image} alt={user.username || "Usuario"} />
+                      {isGoogleUser && user ? (
+                        <AvatarImage alt={user.username || "Usuario"} />
                       ) : (
                         <AvatarFallback className="text-2xl bg-primary text-primary-foreground">
                           {getUserInitials()}
@@ -256,7 +256,7 @@ export default function PerfilPage() {
                     <CardDescription className="text-center">{user?.email}</CardDescription>
 
                     {/* Mostrar badge de tipo de cuenta */}
-                    <Badge className={`mt-2 ${isPremium ? "bg-primary" : "bg-muted"}`}>
+                    <Badge className={`mt-2 ${isPremium ? "bg-primary" : ""}`}>
                       {isPremium ? "Cuenta Premium" : "Cuenta Básica"}
                     </Badge>
                   </div>
@@ -637,11 +637,11 @@ export default function PerfilPage() {
                                               0,
                                               datos.peso > objetivos.pesoDeseado
                                                 ? 100 -
-                                                    ((datos.peso - objetivos.pesoDeseado) / (datos.peso * 0.2)) * 100
+                                                ((datos.peso - objetivos.pesoDeseado) / (datos.peso * 0.2)) * 100
                                                 : 100 -
-                                                    ((objetivos.pesoDeseado - datos.peso) /
-                                                      (objetivos.pesoDeseado * 0.2)) *
-                                                      100,
+                                                ((objetivos.pesoDeseado - datos.peso) /
+                                                  (objetivos.pesoDeseado * 0.2)) *
+                                                100,
                                             ),
                                           )}%`,
                                         }}
