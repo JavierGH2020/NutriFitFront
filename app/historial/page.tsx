@@ -10,7 +10,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { format, subDays, startOfMonth, endOfMonth, subMonths, subYears } from "date-fns"
-import { es } from "date-fns/locale"
+import { isValid } from 'date-fns'
+import { es } from 'date-fns/locale'
 import {
   getHistorialAlimentos,
   getHistorialEjercicios,
@@ -155,14 +156,8 @@ export default function HistorialPage() {
       setEjerciciosHistorial(ejerciciosAgrupados)
       setIsLoadingEjercicios(false)
 
-      // Obtener historial de IMC
-      const imcParams = {
-        "filters[fecha][$gte]": fechaInicio,
-        "filters[fecha][$lte]": fechaFin,
-        sort: "fecha:desc",
-      }
 
-      const imcResponse = await getHistorialIMC(imcParams)
+      const imcResponse = await getHistorialIMC()
       setImcHistorial(imcResponse.data || [])
       setIsLoadingIMC(false)
     } catch (err) {
@@ -174,11 +169,15 @@ export default function HistorialPage() {
     }
   }
 
-  // Función para formatear la fecha
-  const formatearFecha = (fechaStr: string) => {
-    const fecha = new Date(fechaStr)
-    return format(fecha, "PPP", { locale: es })
+  const formatearFecha = (fechaStr?: string): string => {
+    if (!fechaStr) return 'Fecha no disponible'
+  
+    const fecha = new Date(fechaStr) // o parseISO(fechaStr) si estás seguro de que es ISO
+    if (!isValid(fecha)) return 'Fecha inválida'
+  
+    return format(fecha, 'PPP', { locale: es })
   }
+  
 
   // Función para calcular totales de alimentos por día
   const calcularTotalesDia = (alimentos: Alimento[]) => {
@@ -224,7 +223,10 @@ export default function HistorialPage() {
   return (
     <AuthGuard>
       <div className="container py-8">
-        <h1 className="mb-6 text-3xl font-bold">Historial</h1>
+        <h1 className="mb-3 text-3xl font-bold">Historial</h1>
+        <CardDescription className="mb-6 text-muted-foreground">
+          El filtro del historial mostrará todos los elementos registrados dentro del periodo o rango de fechas seleccionado
+        </CardDescription>
 
         {error && (
           <Alert variant="destructive" className="mb-4">
@@ -403,6 +405,7 @@ export default function HistorialPage() {
                             <TableHead className="hidden md:table-cell">Series</TableHead>
                             <TableHead className="hidden md:table-cell">Repeticiones</TableHead>
                             <TableHead className="hidden md:table-cell">Peso (kg)</TableHead>
+                            <TableHead className="hidden md:table-cell">Intensidad</TableHead>
                             <TableHead>Categoría</TableHead>
                           </TableRow>
                         </TableHeader>
@@ -413,18 +416,19 @@ export default function HistorialPage() {
                               <TableCell className="hidden md:table-cell">{ejercicio.series}</TableCell>
                               <TableCell className="hidden md:table-cell">{ejercicio.repeticiones}</TableCell>
                               <TableCell className="hidden md:table-cell">{ejercicio.peso}</TableCell>
-                              <TableCell className="capitalize">{ejercicio.categoria}</TableCell>
+                              <TableCell className="hidden md:table-cell">{ejercicio.intensidad}</TableCell>
+                              <TableCell className="capitalize">{ejercicio.tipo}</TableCell>
                             </TableRow>
                           ))}
                         </TableBody>
                       </Table>
 
                       <div className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-4">
-                        {Array.from(new Set(dia.ejercicios.map((e) => e.categoria))).map((categoria) => {
-                          const ejerciciosPorCategoria = dia.ejercicios.filter((e) => e.categoria === categoria).length
+                        {Array.from(new Set(dia.ejercicios.map((e) => e.tipo))).map((tipo) => {
+                          const ejerciciosPorCategoria = dia.ejercicios.filter((e) => e.tipo === tipo).length
                           return (
-                            <div key={categoria} className="rounded-lg border p-3">
-                              <div className="text-sm text-muted-foreground capitalize">{categoria}</div>
+                            <div key={tipo} className="rounded-lg border p-3">
+                              <div className="text-sm text-muted-foreground capitalize">{tipo}</div>
                               <div className="text-lg font-semibold">{ejerciciosPorCategoria} ejercicios</div>
                             </div>
                           )
@@ -454,7 +458,7 @@ export default function HistorialPage() {
                   <Card key={registro.id}>
                     <CardHeader className="pb-2">
                       <div className="flex items-center justify-between">
-                        <CardTitle>{formatearFecha(registro.fecha)}</CardTitle>
+                        <CardTitle>Registro de IMC</CardTitle>
                         <Badge
                           variant={
                             registro.categoria.includes("normal")
@@ -467,7 +471,6 @@ export default function HistorialPage() {
                           {registro.categoria}
                         </Badge>
                       </div>
-                      <CardDescription>Registro de IMC</CardDescription>
                     </CardHeader>
                     <CardContent>
                       <div className="flex flex-col items-center justify-center space-y-2 rounded-lg bg-muted p-6 text-center mb-4">

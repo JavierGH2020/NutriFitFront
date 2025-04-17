@@ -28,7 +28,7 @@ import { es } from "date-fns/locale"
 import { getAlimentos, createAlimento, updateAlimento, deleteAlimento, type Alimento } from "@/lib/api"
 import AuthGuard from "@/components/auth-guard"
 
-type AlimentoFormData = {
+type AlimentoDTO = {
   nombre: string
   calorias: number
   proteinas: number
@@ -40,13 +40,13 @@ type AlimentoFormData = {
 
 export default function AlimentosPage() {
   const [alimentos, setAlimentos] = useState<Alimento[]>([])
-  const [nuevoAlimento, setNuevoAlimento] = useState<AlimentoFormData>({
+  const [nuevoAlimento, setNuevoAlimento] = useState<AlimentoDTO>({
     nombre: "",
     calorias: 0,
     proteinas: 0,
     carbohidratos: 0,
     grasas: 0,
-    fecha: new Date().toISOString().split("T")[0],
+    fecha: format(new Date(), "yyyy-MM-dd"),
     tipo: "desayuno",
   })
   const [alimentoEditando, setAlimentoEditando] = useState<Alimento | null>(null)
@@ -90,7 +90,7 @@ export default function AlimentosPage() {
     const { name, value } = e.target
     setNuevoAlimento({
       ...nuevoAlimento,
-      [name]: name === "nombre" || name === "fecha" || name === "tipo" ? value : Number(value),
+      [name]: name === "nombre" || name === "fecha" || name === "tipo" ? value : (!isNaN(Number(value)) ? Number(value) : 0),
     })
   }
 
@@ -100,7 +100,7 @@ export default function AlimentosPage() {
     const { name, value } = e.target
     setAlimentoEditando({
       ...alimentoEditando,
-      [name]: name === "nombre" || name === "fecha" || name === "tipo" ? value : Number(value),
+      [name]: name === "nombre" || name === "fecha" || name === "tipo" ? value : (!isNaN(Number(value)) ? Number(value) : 0),
     })
   }
 
@@ -124,10 +124,11 @@ export default function AlimentosPage() {
     }
   }
 
-  const handleEdit = (id: number) => {
-    const alimentoToEdit = alimentos.find((alimento) => alimento.id === id)
+  const handleEdit = (documentId: number) => {
+    const alimentoToEdit = alimentos.find((alimento) => alimento.documentId === documentId.toString())
     if (alimentoToEdit) {
       setAlimentoEditando(alimentoToEdit)
+      console.log("alimento en edición", alimentoToEdit)
       setIsEditDialogOpen(true)
     }
   }
@@ -140,16 +141,16 @@ export default function AlimentosPage() {
       // Extraer solo los campos necesarios para la actualización
       const dataToUpdate = {
         nombre: alimentoEditando.nombre || "",
-        calorias: alimentoEditando.calorias || 0,
-        proteinas: alimentoEditando.proteinas || 0,
-        carbohidratos: alimentoEditando.carbohidratos || 0,
-        grasas: alimentoEditando.grasas || 0,
+        calorias: alimentoEditando.calorias,
+        proteinas: alimentoEditando.proteinas,
+        carbohidratos: alimentoEditando.carbohidratos,
+        grasas: alimentoEditando.grasas,
         fecha: alimentoEditando.fecha || new Date().toISOString().split("T")[0],
         tipo: alimentoEditando.tipo || "desayuno",
       }
 
-      const response = await updateAlimento(alimentoEditando.id, dataToUpdate)
-      setAlimentos(alimentos.map((alimento) => (alimento.id === alimentoEditando.id ? response.data : alimento)))
+      const response = await updateAlimento(alimentoEditando.documentId, dataToUpdate)
+      setAlimentos(alimentos.map((alimento) => (alimento.documentId === alimentoEditando.documentId ? response.data : alimento)))
       setAlimentoEditando(null)
       setIsEditDialogOpen(false)
     } catch (err) {
@@ -158,10 +159,10 @@ export default function AlimentosPage() {
     }
   }
 
-  const handleDelete = async (id: number) => {
+  const handleDelete = async (documentId: number) => {
     try {
-      await deleteAlimento(id)
-      setAlimentos(alimentos.filter((alimento) => alimento.id !== id))
+      await deleteAlimento(documentId)
+      setAlimentos(alimentos.filter((alimento) => alimento.documentId !== documentId.toString()))
     } catch (err) {
       setError("Error al eliminar el alimento. Por favor, inténtalo de nuevo.")
       console.error(err)
@@ -216,6 +217,7 @@ export default function AlimentosPage() {
   const filteredAlimentos = alimentos.filter((alimento) =>
     alimento && alimento.nombre ? alimento.nombre.toLowerCase().includes(searchTerm.toLowerCase()) : false,
   )
+  console.log(filteredAlimentos)
 
   // Calcular totales asegurando que sean números
   const totals = filteredAlimentos.reduce(
@@ -631,10 +633,10 @@ export default function AlimentosPage() {
                                 {alimento.fecha ? new Date(alimento.fecha).toLocaleDateString() : "N/A"}
                               </TableCell>
                               <TableCell className="text-right">
-                                <Button variant="ghost" size="icon" onClick={() => handleEdit(alimento.id)}>
+                                <Button variant="ghost" size="icon" onClick={() => handleEdit(alimento.documentId)}>
                                   <Edit className="h-4 w-4" />
                                 </Button>
-                                <Button variant="ghost" size="icon" onClick={() => handleDelete(alimento.id)}>
+                                <Button variant="ghost" size="icon" onClick={() => handleDelete(alimento.documentId)}>
                                   <Trash className="h-4 w-4" />
                                 </Button>
                               </TableCell>
@@ -689,10 +691,10 @@ export default function AlimentosPage() {
                                     {alimento.grasas !== null ? `${alimento.grasas}g` : "N/A"}
                                   </TableCell>
                                   <TableCell className="text-right">
-                                    <Button variant="ghost" size="icon" onClick={() => handleEdit(alimento.id)}>
+                                    <Button variant="ghost" size="icon" onClick={() => handleEdit(alimento.documentId)}>
                                       <Edit className="h-4 w-4" />
                                     </Button>
-                                    <Button variant="ghost" size="icon" onClick={() => handleDelete(alimento.id)}>
+                                    <Button variant="ghost" size="icon" onClick={() => handleDelete(alimento.documentId)}>
                                       <Trash className="h-4 w-4" />
                                     </Button>
                                   </TableCell>
@@ -712,4 +714,3 @@ export default function AlimentosPage() {
     </AuthGuard>
   )
 }
-

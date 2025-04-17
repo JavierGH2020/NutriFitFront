@@ -4,7 +4,19 @@ import type React from "react"
 
 import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
-import { Plus, Search, Edit, Trash, Loader2, Calendar, Clock, ArrowUp, ArrowDown, AlertCircle } from "lucide-react"
+import {
+  Plus,
+  Search,
+  Edit,
+  Trash,
+  Loader2,
+  Calendar,
+  Clock,
+  ArrowUp,
+  ArrowDown,
+  AlertCircle,
+  Info,
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -22,8 +34,9 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Checkbox } from "@/components/ui/checkbox"
 import { Badge } from "@/components/ui/badge"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { useToast } from "@/hooks/use-toast"
 import {
   getRutinas,
@@ -40,15 +53,12 @@ import {
 import AuthGuard from "@/components/auth-guard"
 import PremiumGuard from "@/components/premium-guard"
 
-const diasSemana = [
-  { id: "lunes", label: "Lunes" },
-  { id: "martes", label: "Martes" },
-  { id: "miercoles", label: "Miércoles" },
-  { id: "jueves", label: "Jueves" },
-  { id: "viernes", label: "Viernes" },
-  { id: "sabado", label: "Sábado" },
-  { id: "domingo", label: "Domingo" },
-]
+// Mapeo para los días de la semana
+const diasSemanaMap = {
+  uno: "Una vez por semana",
+  dos: "Dos veces por semana",
+  tres: "Tres veces por semana",
+}
 
 export default function RutinasPage() {
   const router = useRouter()
@@ -58,7 +68,7 @@ export default function RutinasPage() {
   const [nuevaRutina, setNuevaRutina] = useState({
     nombre: "",
     descripcion: "",
-    diasSemana: [] as string[],
+    diasSemana: undefined as "uno" | "dos" | "tres" | undefined,
   })
   const [rutinaEditando, setRutinaEditando] = useState<Rutina | null>(null)
   const [rutinaSeleccionada, setRutinaSeleccionada] = useState<Rutina | null>(null)
@@ -150,34 +160,20 @@ export default function RutinasPage() {
     } as Rutina)
   }
 
-  const handleDiasSemanaChange = (dia: string, checked: boolean) => {
-    if (checked) {
-      setNuevaRutina({
-        ...nuevaRutina,
-        diasSemana: [...nuevaRutina.diasSemana, dia],
-      })
-    } else {
-      setNuevaRutina({
-        ...nuevaRutina,
-        diasSemana: nuevaRutina.diasSemana.filter((d) => d !== dia),
-      })
-    }
+  const handleDiasSemanaChange = (value: string) => {
+    setNuevaRutina({
+      ...nuevaRutina,
+      diasSemana: value as "uno" | "dos" | "tres",
+    })
   }
 
-  const handleEditDiasSemanaChange = (dia: string, checked: boolean) => {
+  const handleEditDiasSemanaChange = (value: string) => {
     if (!rutinaEditando) return
 
-    if (checked) {
-      setRutinaEditando({
-        ...rutinaEditando,
-        diasSemana: [...(rutinaEditando.diasSemana || []), dia],
-      } as Rutina)
-    } else {
-      setRutinaEditando({
-        ...rutinaEditando,
-        diasSemana: (rutinaEditando.diasSemana || []).filter((d) => d !== dia),
-      } as Rutina)
-    }
+    setRutinaEditando({
+      ...rutinaEditando,
+      diasSemana: value as "uno" | "dos" | "tres",
+    } as Rutina)
   }
 
   const handleSubmit = async () => {
@@ -196,15 +192,15 @@ export default function RutinasPage() {
       const rutinaData = {
         nombre: nuevaRutina.nombre,
         descripcion: nuevaRutina.descripcion || "",
-        diasSemana: nuevaRutina.diasSemana || [],
+        diasSemana: nuevaRutina.diasSemana,
         ejercicios: [],
       }
 
-      console.log("Enviando datos para crear rutina:", rutinaData)
+      //console.log("Enviando datos para crear rutina:", rutinaData)
 
       const response = await createRutina(rutinaData)
 
-      console.log("Respuesta completa de creación:", response)
+      //console.log("Respuesta completa de creación:", response)
 
       if (response && response.data) {
         // Actualizar el estado con la nueva rutina
@@ -214,7 +210,7 @@ export default function RutinasPage() {
         setNuevaRutina({
           nombre: "",
           descripcion: "",
-          diasSemana: [],
+          diasSemana: undefined,
         })
 
         // Cerrar el diálogo
@@ -237,8 +233,8 @@ export default function RutinasPage() {
     }
   }
 
-  const handleEdit = (id: number) => {
-    const rutinaToEdit = rutinas.find((rutina) => rutina.id === id)
+  const handleEdit = (documentId: string) => {
+    const rutinaToEdit = rutinas.find((rutina) => rutina.documentId === documentId)
     if (rutinaToEdit) {
       setRutinaEditando(rutinaToEdit)
       setIsEditDialogOpen(true)
@@ -252,20 +248,17 @@ export default function RutinasPage() {
     setError(null)
 
     try {
-      const response = await updateRutina(rutinaEditando.id, {
+      const response = await updateRutina(rutinaEditando.documentId, {
         nombre: rutinaEditando.nombre,
         descripcion: rutinaEditando.descripcion,
         diasSemana: rutinaEditando.diasSemana,
       })
 
-      setRutinas(rutinas.map((rutina) => (rutina.id === rutinaEditando.id ? response.data : rutina)))
+      setRutinas(rutinas.map((rutina) => (rutina.documentId === rutinaEditando.documentId ? response.data : rutina)))
       setRutinaEditando(null)
       setIsEditDialogOpen(false)
-
-      // Si la rutina que se está editando es la seleccionada, actualizarla
-      if (rutinaSeleccionada && rutinaSeleccionada.id === rutinaEditando.id) {
-        setRutinaSeleccionada(response.data)
-      }
+      setRutinaSeleccionada(response.data)
+      
 
       toast({
         title: "Rutina actualizada",
@@ -279,17 +272,13 @@ export default function RutinasPage() {
     }
   }
 
-  const handleDelete = async (id: number) => {
-    if (!confirm("¿Estás seguro de que deseas eliminar esta rutina?")) {
-      return
-    }
-
+  const handleDelete = async (documentId: string) => {
     try {
-      await deleteRutina(id)
-      setRutinas(rutinas.filter((rutina) => rutina.id !== id))
+      await deleteRutina(documentId)
+      setRutinas(rutinas.filter((rutina) => rutina.documentId !== documentId))
 
       // Si la rutina que se está eliminando es la seleccionada, deseleccionarla
-      if (rutinaSeleccionada && rutinaSeleccionada.id === id) {
+      if (rutinaSeleccionada && rutinaSeleccionada.documentId === documentId) {
         setRutinaSeleccionada(null)
       }
 
@@ -321,7 +310,7 @@ export default function RutinasPage() {
     setIsAddEjercicioDialogOpen(true)
   }
 
-  // Modificar la función handleSaveEjercicio para usar la relación directa
+  // Modificar la función handleSaveEjercicio para usar documentId en lugar de id
   const handleSaveEjercicio = async () => {
     if (!rutinaSeleccionada || nuevoEjercicioRutina.ejercicioId === 0) return
 
@@ -329,22 +318,23 @@ export default function RutinasPage() {
     setError(null)
 
     try {
-      // Con la nueva estructura de relación, solo necesitamos pasar el ID del ejercicio
+      // Usar documentId en lugar de id
       const response = await addEjercicioToRutina(
-        rutinaSeleccionada.id,
-        nuevoEjercicioRutina.ejercicioId,
+        rutinaSeleccionada.documentId,
+        nuevoEjercicioRutina.ejercicioId.toString(),
         nuevoEjercicioRutina.series,
         nuevoEjercicioRutina.repeticiones,
         nuevoEjercicioRutina.peso,
         nuevoEjercicioRutina.descanso,
-        0, // El orden ya no es necesario con la relación directa
       )
 
       // Actualizar la rutina seleccionada con los nuevos datos
       setRutinaSeleccionada(response.data)
 
-      // Actualizar la lista de rutinas
-      setRutinas(rutinas.map((rutina) => (rutina.id === rutinaSeleccionada.id ? response.data : rutina)))
+      // Actualizar la lista de rutinas usando documentId para la comparación
+      setRutinas(
+        rutinas.map((rutina) => (rutina.documentId === rutinaSeleccionada.documentId ? response.data : rutina)),
+      )
 
       setIsAddEjercicioDialogOpen(false)
 
@@ -360,6 +350,7 @@ export default function RutinasPage() {
     }
   }
 
+  // Modificar la función handleRemoveEjercicio para usar documentId
   const handleRemoveEjercicio = async (index: number) => {
     if (!rutinaSeleccionada) return
 
@@ -368,13 +359,16 @@ export default function RutinasPage() {
     }
 
     try {
-      const response = await removeEjercicioFromRutina(rutinaSeleccionada.id, index)
+      // Usar documentId en lugar de id
+      const response = await removeEjercicioFromRutina(rutinaSeleccionada.documentId, index)
 
       // Actualizar la rutina seleccionada con los nuevos datos
       setRutinaSeleccionada(response.data)
 
-      // Actualizar la lista de rutinas
-      setRutinas(rutinas.map((rutina) => (rutina.id === rutinaSeleccionada.id ? response.data : rutina)))
+      // Actualizar la lista de rutinas usando documentId para la comparación
+      setRutinas(
+        rutinas.map((rutina) => (rutina.documentId === rutinaSeleccionada.documentId ? response.data : rutina)),
+      )
 
       toast({
         title: "Ejercicio eliminado",
@@ -399,12 +393,11 @@ export default function RutinasPage() {
     // Necesitamos usar el endpoint de Strapi para actualizar el orden
 
     // Por ahora, mostramos un mensaje de que esta funcionalidad no está disponible
-    setError(
-      "La funcionalidad de reordenar ejercicios no está disponible con la nueva estructura de datos. Estamos trabajando en ello.",
-    )
-
-    // Alternativa: Eliminar y volver a añadir los ejercicios en el orden deseado
-    // Esto requeriría implementación adicional
+    toast({
+      title: "Funcionalidad no disponible",
+      description: "La funcionalidad de reordenar ejercicios no está disponible con la nueva estructura de datos.",
+      variant: "destructive",
+    })
   }
 
   const filteredRutinas = rutinas.filter((rutina) => rutina.nombre.toLowerCase().includes(searchTerm.toLowerCase()))
@@ -471,19 +464,33 @@ export default function RutinasPage() {
                     />
                   </div>
                   <div className="grid gap-2">
-                    <Label>Días de la semana</Label>
-                    <div className="grid grid-cols-2 gap-2">
-                      {diasSemana.map((dia) => (
-                        <div key={dia.id} className="flex items-center space-x-2">
-                          <Checkbox
-                            id={`dia-${dia.id}`}
-                            checked={nuevaRutina.diasSemana.includes(dia.id)}
-                            onCheckedChange={(checked) => handleDiasSemanaChange(dia.id, checked === true)}
-                          />
-                          <Label htmlFor={`dia-${dia.id}`}>{dia.label}</Label>
-                        </div>
-                      ))}
+                    <div className="flex items-center gap-2">
+                      <Label>Frecuencia semanal</Label>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Selecciona cuántas veces por semana realizarás esta rutina</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                     </div>
+                    <RadioGroup value={nuevaRutina.diasSemana} onValueChange={handleDiasSemanaChange}>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="uno" id="r1" />
+                        <Label htmlFor="r1">Una vez por semana</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="dos" id="r2" />
+                        <Label htmlFor="r2">Dos veces por semana</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="tres" id="r3" />
+                        <Label htmlFor="r3">Tres veces por semana</Label>
+                      </div>
+                    </RadioGroup>
                   </div>
                 </div>
                 <DialogFooter>
@@ -530,19 +537,33 @@ export default function RutinasPage() {
                       />
                     </div>
                     <div className="grid gap-2">
-                      <Label>Días de la semana</Label>
-                      <div className="grid grid-cols-2 gap-2">
-                        {diasSemana.map((dia) => (
-                          <div key={dia.id} className="flex items-center space-x-2">
-                            <Checkbox
-                              id={`edit-dia-${dia.id}`}
-                              checked={(rutinaEditando.diasSemana || []).includes(dia.id)}
-                              onCheckedChange={(checked) => handleEditDiasSemanaChange(dia.id, checked === true)}
-                            />
-                            <Label htmlFor={`edit-dia-${dia.id}`}>{dia.label}</Label>
-                          </div>
-                        ))}
+                      <div className="flex items-center gap-2">
+                        <Label>Frecuencia semanal</Label>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Selecciona cuántas veces por semana realizarás esta rutina</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
                       </div>
+                      <RadioGroup value={rutinaEditando.diasSemana} onValueChange={handleEditDiasSemanaChange}>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="uno" id="edit-r1" />
+                          <Label htmlFor="edit-r1">Una vez por semana</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="dos" id="edit-r2" />
+                          <Label htmlFor="edit-r2">Dos veces por semana</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="tres" id="edit-r3" />
+                          <Label htmlFor="edit-r3">Tres veces por semana</Label>
+                        </div>
+                      </RadioGroup>
                     </div>
                   </div>
                 )}
@@ -585,7 +606,7 @@ export default function RutinasPage() {
                       </SelectTrigger>
                       <SelectContent>
                         {ejercicios.map((ejercicio) => (
-                          <SelectItem key={ejercicio.id} value={ejercicio.id.toString()}>
+                          <SelectItem key={ejercicio.documentId || ejercicio.id} value={ejercicio.id.toString()}>
                             {ejercicio.nombre}
                           </SelectItem>
                         ))}
@@ -699,12 +720,14 @@ export default function RutinasPage() {
                         </Button>
                       </div>
                     ) : (
+                      // Modificar el mapeo de rutinas para usar documentId como key y en la comparación
                       <div className="divide-y">
                         {filteredRutinas.map((rutina) => (
                           <div
-                            key={rutina.id}
-                            className={`p-4 cursor-pointer hover:bg-muted transition-colors ${rutinaSeleccionada?.id === rutina.id ? "bg-muted" : ""
-                              }`}
+                            key={rutina.documentId || `rutina-${rutina.id}`}
+                            className={`p-4 cursor-pointer hover:bg-muted transition-colors ${
+                              rutinaSeleccionada?.documentId === rutina.documentId ? "bg-muted" : ""
+                            }`}
                             onClick={() => handleSelectRutina(rutina)}
                           >
                             <div className="flex justify-between items-start">
@@ -713,22 +736,11 @@ export default function RutinasPage() {
                                 <p className="text-sm text-muted-foreground line-clamp-1">
                                   {rutina.descripcion || "Sin descripción"}
                                 </p>
-                                <div className="flex flex-wrap gap-1 mt-2">
-                                  {Array.isArray(rutina.diasSemana)
-                                    ? rutina.diasSemana.map((dia) => (
-                                      <Badge key={dia} variant="outline" className="text-xs">
-                                        {diasSemana.find((d) => d.id === dia)?.label || dia}
-                                      </Badge>
-                                    ))
-                                    : rutina.diasSemana && (
-                                      <Badge variant="outline" className="text-xs">
-                                        {(Array.isArray(rutina.diasSemana) ? rutina.diasSemana : [rutina.diasSemana])
-                                          .map((dia) => diasSemana.find((d) => d.id === dia)?.label || dia)
-                                          .join(", ")}
-                                      </Badge>
-                                    )}
-
-                                </div>
+                                {rutina.diasSemana && (
+                                  <Badge variant="outline" className="mt-2">
+                                    {diasSemanaMap[rutina.diasSemana] || rutina.diasSemana}
+                                  </Badge>
+                                )}
                               </div>
                               <div className="flex gap-1">
                                 <Button
@@ -736,7 +748,7 @@ export default function RutinasPage() {
                                   size="icon"
                                   onClick={(e) => {
                                     e.stopPropagation()
-                                    handleEdit(rutina.id)
+                                    handleEdit(rutina.documentId)
                                   }}
                                 >
                                   <Edit className="h-4 w-4" />
@@ -746,7 +758,7 @@ export default function RutinasPage() {
                                   size="icon"
                                   onClick={(e) => {
                                     e.stopPropagation()
-                                    handleDelete(rutina.id)
+                                    handleDelete(rutina.documentId)
                                   }}
                                 >
                                   <Trash className="h-4 w-4" />
@@ -770,13 +782,11 @@ export default function RutinasPage() {
                         <div>
                           <CardTitle>{rutinaSeleccionada.nombre}</CardTitle>
                           <CardDescription>{rutinaSeleccionada.descripcion || "Sin descripción"}</CardDescription>
-                          <div className="flex flex-wrap gap-1 mt-2">
-                            {Array.isArray(rutinaSeleccionada.diasSemana) ? rutinaSeleccionada.diasSemana.map((dia) => (
-                              <Badge key={dia} variant="outline">
-                                {diasSemana.find((d) => d.id === dia)?.label || dia}
-                              </Badge>
-                            )) : null}
-                          </div>
+                          {rutinaSeleccionada.diasSemana && (
+                            <Badge variant="outline" className="mt-2">
+                              {diasSemanaMap[rutinaSeleccionada.diasSemana] || rutinaSeleccionada.diasSemana}
+                            </Badge>
+                          )}
                         </div>
                         <Button onClick={handleAddEjercicio}>
                           <Plus className="mr-2 h-4 w-4" />
@@ -809,10 +819,8 @@ export default function RutinasPage() {
                           <TableBody>
                             {rutinaSeleccionada.ejercicios &&
                               rutinaSeleccionada.ejercicios.map((ejercicio, index) => {
-                                // Con la nueva estructura de relación, ejercicio es un objeto completo
-                                // No necesitamos buscar el ejercicio completo
                                 return (
-                                  <TableRow key={index}>
+                                  <TableRow key={ejercicio.documentId || `ejercicio-${index}`}>
                                     <TableCell className="font-medium">
                                       <div className="flex flex-col items-center">
                                         <span>{index + 1}</span>
@@ -842,7 +850,7 @@ export default function RutinasPage() {
                                       <div>
                                         <span className="font-medium">{ejercicio.nombre || "Ejercicio"}</span>
                                         <p className="text-xs text-muted-foreground capitalize">
-                                          {ejercicio.categoria || "Sin categoría"}
+                                          {ejercicio.tipo || "Sin categoría"}
                                         </p>
                                       </div>
                                     </TableCell>
@@ -891,4 +899,3 @@ export default function RutinasPage() {
     </AuthGuard>
   )
 }
-

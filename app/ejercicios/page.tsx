@@ -28,22 +28,26 @@ import { es } from "date-fns/locale"
 import { getEjercicios, createEjercicio, updateEjercicio, deleteEjercicio, type Ejercicio } from "@/lib/api"
 import AuthGuard from "@/components/auth-guard"
 
-type EjercicioFormData = {
+type EjercicioDTO = {
   nombre: string
   series: number
   repeticiones: number
   peso: number
+  fecha: string
   tipo: "pecho" | "espalda" | "piernas" | "hombros" | "brazos" | "abdominales" | "cardio"
+  intensidad: "pricipiante" | "intermedio" | "avanzado"
 }
 
 export default function EntrenosPage() {
   const [ejercicios, setEjercicios] = useState<Ejercicio[]>([])
-  const [nuevoEjercicio, setNuevoEjercicio] = useState<EjercicioFormData>({
+  const [nuevoEjercicio, setNuevoEjercicio] = useState<EjercicioDTO>({
     nombre: "",
     series: 0,
     repeticiones: 0,
     peso: 0,
+    fecha: new Date().toISOString().split("T")[0],
     tipo: "pecho",
+    intensidad: "pricipiante",
   })
   const [ejercicioEditando, setEjercicioEditando] = useState<Ejercicio | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
@@ -85,7 +89,7 @@ export default function EntrenosPage() {
     const { name, value } = e.target
     setNuevoEjercicio({
       ...nuevoEjercicio,
-      [name]: name === "nombre" || name === "tipo" ? value : Number(value),
+      [name]: name === "nombre" || name === "fecha" || name === "tipo" ? value : Number(value),
     })
   }
 
@@ -95,7 +99,7 @@ export default function EntrenosPage() {
     const { name, value } = e.target
     setEjercicioEditando({
       ...ejercicioEditando,
-      [name]: name === "nombre" || name === "tipo" ? value : Number(value),
+      [name]: name === "nombre" || name === "fecha" || name === "tipo" ? value : Number(value),
     })
   }
 
@@ -109,6 +113,8 @@ export default function EntrenosPage() {
         repeticiones: 0,
         peso: 0,
         tipo: "pecho",
+        fecha: new Date().toISOString().split("T")[0],
+        intensidad: "pricipiante",
       })
       setIsDialogOpen(false)
     } catch (err) {
@@ -117,10 +123,12 @@ export default function EntrenosPage() {
     }
   }
 
-  const handleEdit = (id: number) => {
-    const ejercicioToEdit = ejercicios.find((ejercicio) => ejercicio.id === id)
+  const handleEdit = (documentId: number) => {
+    const ejercicioToEdit = ejercicios.find((ejercicio) => ejercicio.documentId === documentId.toString())
+    //alert(documentId)
     if (ejercicioToEdit) {
       setEjercicioEditando(ejercicioToEdit)
+      console.log("Ejercicio ene edicion", ejercicioToEdit)
       setIsEditDialogOpen(true)
     }
   }
@@ -132,14 +140,16 @@ export default function EntrenosPage() {
       // Extraer solo los campos necesarios para la actualización
       const dataToUpdate = {
         nombre: ejercicioEditando.nombre || "",
-        series: ejercicioEditando.series || 0,
-        repeticiones: ejercicioEditando.repeticiones || 0,
-        peso: ejercicioEditando.peso || 0,
+        series: ejercicioEditando.series,
+        repeticiones: ejercicioEditando.repeticiones,
+        peso: ejercicioEditando.peso,
         tipo: ejercicioEditando.tipo || "pecho",
+        intensidad: ejercicioEditando.intensidad || "pricipiante",
+        fecha: ejercicioEditando.fecha || new Date().toISOString().split("T")[0],
       }
 
-      const response = await updateEjercicio(ejercicioEditando.id, dataToUpdate)
-      setEjercicios(ejercicios.map((ejercicio) => (ejercicio.id === ejercicioEditando.id ? response.data : ejercicio)))
+      const response = await updateEjercicio(ejercicioEditando.documentId, dataToUpdate)
+      setEjercicios(ejercicios.map((ejercicio) => (ejercicio.documentId === ejercicioEditando.documentId ? response.data : ejercicio)))
       setEjercicioEditando(null)
       setIsEditDialogOpen(false)
     } catch (err) {
@@ -148,11 +158,11 @@ export default function EntrenosPage() {
     }
   }
 
-  const handleDelete = async (id: number) => {
+  const handleDelete = async (documentId: number) => {
     try {
-      const result = await deleteEjercicio(id)
+      const result = await deleteEjercicio(documentId)
       if (result.success) {
-        setEjercicios(ejercicios.filter((ejercicio) => ejercicio.id !== id))
+        setEjercicios(ejercicios.filter((ejercicio) => ejercicio.documentId !== documentId.toString()))
       } else {
         throw new Error("No se pudo eliminar el ejercicio")
       }
@@ -166,6 +176,7 @@ export default function EntrenosPage() {
     if (date) {
       setNuevoEjercicio({
         ...nuevoEjercicio,
+        fecha: format(date, "yyyy-MM-dd"),
       })
       setDate(date)
     }
@@ -188,14 +199,29 @@ export default function EntrenosPage() {
   const handleFilterClear = () => {
     setFilterTipo(null)
     setIsFilterOpen(false)
-    fetchEjercicios()
+    // Llamar a fetchEjercicios sin filtros para cargar todos los ejercicios
+    const fetchAllEjericicos = async () => {
+      setIsLoading(true)
+      try {
+        const response = await getEjercicios({})
+        setEjercicios(response.data || [])
+      } catch (err) {
+        setError("Error al cargar los ejericios. Por favor, inténtalo de nuevo.")
+        console.error(err)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchAllEjericicos()
   }
 
   const filteredEjercicios = ejercicios.filter((ejercicio) =>
-    ejercicio.nombre.toLowerCase().includes(searchTerm.toLowerCase()),
+    ejercicio && ejercicio.nombre ? ejercicio.nombre.toLowerCase().includes(searchTerm.toLowerCase()) : false,
   )
 
   const tipos = ["pecho", "espalda", "piernas", "hombros", "brazos", "abdominales", "cardio"]
+  const intensidad = ["pricipiante", "intermedio", "avanzado"]
 
   return (
     <AuthGuard>
@@ -214,7 +240,7 @@ export default function EntrenosPage() {
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 type="search"
-                placeholder="Buscar alimentos..."
+                placeholder="Buscar ejercicios..."
                 className="pl-8"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -310,23 +336,65 @@ export default function EntrenosPage() {
                     />
                   </div>
                 </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="tipo">Categoría</Label>
-                  <Select
-                    value={nuevoEjercicio.tipo}
-                    onValueChange={(value) => setNuevoEjercicio({ ...nuevoEjercicio, tipo: value as any })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Seleccionar categoría" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {tipos.map((cat) => (
-                        <SelectItem key={cat} value={cat} className="capitalize">
-                          {cat}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                <div className="grid gap-4 py-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="tipo">Categoría</Label>
+                    <Select
+                      value={nuevoEjercicio.tipo}
+                      onValueChange={(value) => setNuevoEjercicio({ ...nuevoEjercicio, tipo: value as any })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Seleccionar categoría" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {tipos.map((cat) => (
+                          <SelectItem key={cat} value={cat} className="capitalize">
+                            {cat}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Label htmlFor="tipo">Intensidad</Label>
+                    <Select
+                      value={nuevoEjercicio.intensidad}
+                      onValueChange={(value) => setNuevoEjercicio({ ...nuevoEjercicio, intensidad: value as any })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Seleccionar intensidad" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {intensidad.map((cat) => (
+                          <SelectItem key={cat} value={cat} className="capitalize">
+                            {cat}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="fecha">Fecha</Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" className="w-full justify-start text-left font-normal">
+                          {date ? format(date, "PPP", { locale: es }) : <span>Seleccionar fecha</span>}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0">
+                        <div className="border rounded-md">
+                          <Calendar
+                            mode="single"
+                            selected={date}
+                            onSelect={handleDateSelect}
+                            locale={es}
+                            className="p-0"
+                            initialFocus
+                            fixedWeeks
+                            ISOWeek
+                          />
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
                 </div>
               </div>
               <DialogFooter>
@@ -410,6 +478,48 @@ export default function EntrenosPage() {
                       </SelectContent>
                     </Select>
                   </div>
+                  <div>
+                    <Label htmlFor="tipo">Intensidad</Label>
+                    <Select
+                      value={ejercicioEditando.intensidad}
+                      onValueChange={(value) => setEjercicioEditando({ ...ejercicioEditando, intensidad: value as any })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Seleccionar intensidad" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {intensidad.map((cat) => (
+                          <SelectItem key={cat} value={cat} className="capitalize">
+                            {cat}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="fecha">Fecha</Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" className="w-full justify-start text-left font-normal">
+                          {date ? format(date, "PPP", { locale: es }) : <span>Seleccionar fecha</span>}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0">
+                        <div className="border rounded-md">
+                          <Calendar
+                            mode="single"
+                            selected={date}
+                            onSelect={handleEditDateSelect}
+                            locale={es}
+                            className="p-0"
+                            autoFocus
+                            fixedWeeks
+                            ISOWeek
+                          />
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
                 </div>
               )}
               <DialogFooter>
@@ -455,7 +565,9 @@ export default function EntrenosPage() {
                           <TableHead className="hidden md:table-cell">Series</TableHead>
                           <TableHead className="hidden md:table-cell">Repeticiones</TableHead>
                           <TableHead className="hidden md:table-cell">Peso (kg)</TableHead>
-                          <TableHead>Tipo</TableHead>
+                          <TableHead className="hidden md:table-cell">Intensidad</TableHead>
+                          <TableHead className="hidden md:table-cell">Tipo</TableHead>
+                          <TableHead>Fecha</TableHead>
                           <TableHead className="text-right">Acciones</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -463,15 +575,29 @@ export default function EntrenosPage() {
                         {filteredEjercicios.map((ejercicio) => (
                           <TableRow key={ejercicio.id}>
                             <TableCell className="font-medium">{ejercicio.nombre}</TableCell>
-                            <TableCell className="hidden md:table-cell">{ejercicio.series}</TableCell>
-                            <TableCell className="hidden md:table-cell">{ejercicio.repeticiones}</TableCell>
-                            <TableCell className="hidden md:table-cell">{ejercicio.peso}</TableCell>
-                            <TableCell className="capitalize">{ejercicio.tipo}</TableCell>
+                            <TableCell className="hidden md:table-cell">
+                              {ejercicio.series !== null ? `${ejercicio.series}` : "-"}
+                            </TableCell>
+                            <TableCell className="hidden md:table-cell">
+                              {ejercicio.repeticiones !== null ? `${ejercicio.repeticiones}` : "-"}
+                            </TableCell>
+                            <TableCell className="hidden md:table-cell">
+                              {ejercicio.peso !== null ? `${ejercicio.peso}` : "-"}
+                            </TableCell>
+                            <TableCell className="hidden md:table-cell">
+                              {ejercicio.intensidad !== null ? `${ejercicio.intensidad}` : "-"}
+                            </TableCell>
+                            <TableCell className="capitalize">
+                              {ejercicio.tipo ? ejercicio.tipo : "Sin especificar"}
+                            </TableCell>
+                            <TableCell>
+                              {ejercicio.fecha ? new Date(ejercicio.fecha).toLocaleDateString() : "-"}
+                            </TableCell>
                             <TableCell className="text-right">
-                              <Button variant="ghost" size="icon" onClick={() => handleEdit(ejercicio.id)}>
+                              <Button variant="ghost" size="icon" onClick={() => handleEdit(ejercicio.documentId)}>
                                 <Edit className="h-4 w-4" />
                               </Button>
-                              <Button variant="ghost" size="icon" onClick={() => handleDelete(ejercicio.id)}>
+                              <Button variant="ghost" size="icon" onClick={() => handleDelete(ejercicio.documentId)}>
                                 <Trash className="h-4 w-4" />
                               </Button>
                             </TableCell>
@@ -483,7 +609,7 @@ export default function EntrenosPage() {
                 </CardContent>
               </Card>
             </TabsContent>
-            {tipos.map((tipo) => (
+            {["pecho", "espalda", "piernas", "hombros", "brazos", "abdominales", "cardio"].map((tipo) => (
               <TabsContent key={tipo} value={tipo}>
                 <Card>
                   <CardContent className="p-0">
@@ -503,29 +629,36 @@ export default function EntrenosPage() {
                             <TableHead className="hidden md:table-cell">Series</TableHead>
                             <TableHead className="hidden md:table-cell">Repeticiones</TableHead>
                             <TableHead className="hidden md:table-cell">Peso (kg)</TableHead>
-                            <TableHead className="hidden md:table-cell">Tipo</TableHead>
+                            <TableHead className="hidden md:table-cell">Intensidad</TableHead>
                             <TableHead className="text-right">Acciones</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           {filteredEjercicios
-                            .filter((ejercicio) => ejercicio.tipo === tipo)
-                            .map((ejercicio) => (
-                              <TableRow key={ejercicio.id}>
-                                <TableCell className="font-medium">{ejercicio.nombre}</TableCell>
-                                <TableCell className="hidden md:table-cell">{ejercicio.series}</TableCell>
-                                <TableCell className="hidden md:table-cell">{ejercicio.repeticiones}</TableCell>
-                                <TableCell className="hidden md:table-cell">{ejercicio.peso}</TableCell>
-                                <TableCell className="hidden md:table-cell">{ejercicio.tipo}</TableCell>
-                                <TableCell className="text-right">
-                                  <Button variant="ghost" size="icon" onClick={() => handleEdit(ejercicio.id)}>
-                                    <Edit className="h-4 w-4" />
-                                  </Button>
-                                  <Button variant="ghost" size="icon" onClick={() => handleDelete(ejercicio.id)}>
-                                    <Trash className="h-4 w-4" />
-                                  </Button>
-                                </TableCell>
-                              </TableRow>
+                            .filter((ejercicio) => ejercicio.tipo && ejercicio.tipo === tipo)
+                            .map((ejercicio) => (<TableRow key={ejercicio.id}>
+                              <TableCell className="font-medium">{ejercicio.nombre}</TableCell>
+                              <TableCell className="hidden md:table-cell">
+                                {ejercicio.series !== null ? `${ejercicio.series}` : "-"}
+                              </TableCell>
+                              <TableCell className="hidden md:table-cell">
+                                {ejercicio.repeticiones !== null ? `${ejercicio.repeticiones}` : "-"}
+                              </TableCell>
+                              <TableCell className="hidden md:table-cell">
+                                {ejercicio.peso !== null ? `${ejercicio.peso}` : "-"}
+                              </TableCell>
+                              <TableCell className="hidden md:table-cell">
+                                {ejercicio.intensidad !== null ? `${ejercicio.intensidad}` : "-"}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <Button variant="ghost" size="icon" onClick={() => handleEdit(ejercicio.documentId)}>
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                                <Button variant="ghost" size="icon" onClick={() => handleDelete(ejercicio.documentId)}>
+                                  <Trash className="h-4 w-4" />
+                                </Button>
+                              </TableCell>
+                            </TableRow>
                             ))}
                         </TableBody>
                       </Table>

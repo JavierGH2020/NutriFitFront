@@ -25,7 +25,7 @@ export default function PlanesPage() {
       setIsCheckingStatus(true)
       try {
         const isPremium = await isPremiumUser()
-        setCurrentPlan(isPremium ? "premium" : "basico")
+        setCurrentPlan(isPremium ? "authenticated" : "public")
       } catch (err) {
         console.error("Error al verificar el plan del usuario:", err)
         setError("No se pudo verificar tu plan actual. Por favor, intenta de nuevo más tarde.")
@@ -39,7 +39,6 @@ export default function PlanesPage() {
 
   const handleUpgrade = async (plan: string) => {
     if (plan === "basico" || currentPlan === plan) return
-
     setIsLoading(true)
     setError(null)
     setSuccess(null)
@@ -51,8 +50,8 @@ export default function PlanesPage() {
         throw new Error("No se pudo obtener la información del usuario")
       }
 
-      // Actualizar el rol del usuario a premium
-      await updateUserProfile({ id: user.id, role: "authenticated" })
+      // Actualizar el rol del usuario a authenticated
+      await updateUserProfile({ role: 1 })
 
       setSuccess(
         `¡Felicidades! Tu cuenta ha sido actualizada al plan ${plan === "premium" ? "Premium" : "Premium Anual"}.`,
@@ -71,6 +70,7 @@ export default function PlanesPage() {
       }, 2000)
     } catch (err) {
       console.error("Error al actualizar plan:", err)
+      console.log(plan)
       setError("No se pudo procesar la actualización. Por favor, inténtalo de nuevo.")
     } finally {
       setIsLoading(false)
