@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 // Actualizar la importación para obtener register desde auth.ts
-import { register} from "@/lib/auth"
+import { register } from "@/lib/auth"
 import { isAuthenticated } from "@/lib/api"
 
 export default function RegisterPage() {
@@ -66,11 +66,11 @@ export default function RegisterPage() {
     try {
       // Registrar usuario en Strapi con el rol seleccionado
       await register(formData.username, formData.email, formData.password, formData.role)
-
       // Redirigir al usuario a la página principal
       router.push("/login")
     } catch (err: any) {
       console.error("Error de registro:", err)
+      //console.log(formData.username, formData.email, formData.password, formData.role)
 
       // Manejar diferentes tipos de errores
       if (err && typeof err === "object") {

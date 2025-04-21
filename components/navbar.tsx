@@ -64,6 +64,7 @@ export default function Navbar() {
     { name: "Inicio", href: "/" },
     { name: "Alimentos", href: "/alimentos" },
     { name: "Entrenos", href: "/ejercicios" },
+    { name: "Rutinas", href: "/rutinas" },
     { name: "Calculadora IMC", href: "/calculadora" },
     { name: "Historial", href: "/historial" },
   ]
@@ -77,7 +78,20 @@ export default function Navbar() {
   }
 
   // Determinar si el usuario inició sesión con Google
-  const isGoogleUser = user?.provider === "google"
+  const isGoogleUser = user?.provider === "google" || user?.provider === undefined
+  //console.warn("isGoogleUser", isGoogleUser)
+  //console.warn("provider", user?.provider)
+
+  // Si el provider es undefined, lo tratamos como Google
+  useEffect(() => {
+    if (user && user.provider === undefined) {
+      console.warn("Provider undefined, setting as google")
+      setUser({
+        ...user,
+        provider: "google",
+      })
+    }
+  }, [user])
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -151,7 +165,7 @@ export default function Navbar() {
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => router.push("/datos")}>
                     <Database className="mr-2 h-4 w-4" />
-                    <span>Actualizar Datos</span>
+                    <span>Mis Datos</span>
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => router.push("/objetivos")}>
                     <Target className="mr-2 h-4 w-4" />

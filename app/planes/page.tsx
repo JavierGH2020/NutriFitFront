@@ -6,7 +6,7 @@ import { Check, Sparkles, Loader2, AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { updateUserProfile, getCurrentUser, isPremiumUser } from "@/lib/api"
+import { getCurrentUser, isPremiumUser, fetchAPI, updateUserRole } from "@/lib/api"
 import AuthGuard from "@/components/auth-guard"
 import { useToast } from "@/hooks/use-toast"
 
@@ -25,7 +25,7 @@ export default function PlanesPage() {
       setIsCheckingStatus(true)
       try {
         const isPremium = await isPremiumUser()
-        setCurrentPlan(isPremium ? "authenticated" : "public")
+        setCurrentPlan(isPremium ? "premium" : "basico")
       } catch (err) {
         console.error("Error al verificar el plan del usuario:", err)
         setError("No se pudo verificar tu plan actual. Por favor, intenta de nuevo más tarde.")
@@ -37,8 +37,10 @@ export default function PlanesPage() {
     checkUserPlan()
   }, [])
 
+  // Buscar la función handleUpgrade y reemplazarla con esta versión mejorada
   const handleUpgrade = async (plan: string) => {
     if (plan === "basico" || currentPlan === plan) return
+
     setIsLoading(true)
     setError(null)
     setSuccess(null)
@@ -50,8 +52,17 @@ export default function PlanesPage() {
         throw new Error("No se pudo obtener la información del usuario")
       }
 
-      // Actualizar el rol del usuario a authenticated
-      await updateUserProfile({ role: 1 })
+      console.log("Usuario actual:", user)
+      console.log("ID del usuario:", user.id)
+
+      // Determinar el ID del rol correcto para el plan premium
+      // Normalmente, el rol "authenticated" tiene un ID específico en Strapi
+      // Vamos a usar 3 como ejemplo, pero debes verificar el ID correcto en tu base de datos
+      const premiumRoleId = "x9aawizeevtjasviv5bk4s5z" // Ajusta este valor según tu configuración de Strapi
+
+      console.log("Actualizando usuario a rol premium con ID:", premiumRoleId)
+
+      await updateUserRole(user.id, premiumRoleId)
 
       setSuccess(
         `¡Felicidades! Tu cuenta ha sido actualizada al plan ${plan === "premium" ? "Premium" : "Premium Anual"}.`,
@@ -69,8 +80,7 @@ export default function PlanesPage() {
         router.push("/")
       }, 2000)
     } catch (err) {
-      console.error("Error al actualizar plan:", err)
-      console.log(plan)
+      console.error("Error detallado al actualizar plan:", err)
       setError("No se pudo procesar la actualización. Por favor, inténtalo de nuevo.")
     } finally {
       setIsLoading(false)
@@ -204,4 +214,3 @@ export default function PlanesPage() {
     </AuthGuard>
   )
 }
-

@@ -1,5 +1,7 @@
-// Constantes para la API
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:1337"
+import { document } from "postcss"
+
+// Importa la variable de entorno API_URL desde el archivo .env
+export const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:1337"
 
 // Tipos para los datos de la API
 export type User = {
@@ -12,9 +14,27 @@ export type User = {
   createdAt: string
   updatedAt: string
   image?: string // Para la URL de la imagen de perfil de Google
+  role?: "public" | "premium" // Para el rol del usuario
+  documentId?: string
 }
 
 export type DatoUsuario = {
+  id: number
+  edad: number
+  peso: number
+  genero: "hombre" | "mujer"
+  altura: number
+  categoria: string
+  imc: number
+  nivelActividad?: string; // Add this property
+  user?: User
+  createdAt: string
+  updatedAt: string
+  publishedAt?: string
+  documentId?: string
+}
+
+export type Calculadora = {
   id: number
   edad: number
   genero: "hombre" | "mujer"
@@ -22,6 +42,10 @@ export type DatoUsuario = {
   altura: number
   nivelActividad: "bajo" | "medio" | "alto"
   user?: User
+  createdAt: string
+  updatedAt: string
+  publishedAt?: string
+  documentId?: string
 }
 
 export type Objetivo = {
@@ -32,6 +56,10 @@ export type Objetivo = {
   fechaLimite: string
   plan: string
   user?: User
+  createdAt: string
+  updatedAt: string
+  publishedAt?: string
+  documentId?: string
 }
 
 export type Alimento = {
@@ -46,6 +74,8 @@ export type Alimento = {
   createdAt: string
   updatedAt: string
   publishedAt?: string
+  documentId?: string
+  user?: User | number // Relación con el usuario
 }
 
 export type Ejercicio = {
@@ -55,32 +85,27 @@ export type Ejercicio = {
   repeticiones: number
   peso: number
   fecha: string
-  categoria: "pecho" | "espalda" | "piernas" | "hombros" | "brazos" | "abdominales" | "cardio"
+  tipo: "pecho" | "espalda" | "piernas" | "hombros" | "brazos" | "abdominales" | "cardio"
+  intensidad: "principiante" | "medio" | "avanzado"
   createdAt: string
   updatedAt: string
   publishedAt?: string
-}
-
-export type EjercicioRutina = {
-  id: number
-  ejercicio: Ejercicio
-  series: number
-  repeticiones: number
-  peso: number
-  descanso: number
-  orden: number
+  documentId?: string
+  user?: User | number // Relación con el usuario
+  descanso: number // Descanso en segundos
 }
 
 export type Rutina = {
   id: number
   nombre: string
-  descripcion: string
-  diasSemana: string[] // ["lunes", "miercoles", "viernes"]
-  ejercicios: EjercicioRutina[]
+  descripcion?: string
+  diasSemana?: "uno" | "dos" | "tres"
+  ejercicios?: Ejercicio[]
+  user?: User | number // Relación con el usuario
   createdAt: string
   updatedAt: string
   publishedAt?: string
-  user?: User
+  documentId?: string
 }
 
 // Función para limpiar la URL de parámetros de autenticación
@@ -130,49 +155,191 @@ export const isAuthenticated = (): boolean => {
 }
 
 // Función para obtener el usuario actual
-export const getCurrentUser = async (): Promise<User | null> => {
+// Función para obtener el usuario actual con el rol
+export const getCurrentUser = async (): Promise<any> => {
   if (!isAuthenticated()) {
-    return null
+    return null;
   }
 
   try {
-    const response = await fetchAPI("/api/users/me")
-    return response
+    // Hacemos una petición a la API de Strapi para obtener el usuario con el rol
+    const response = await fetchAPI("/api/users/me?populate=role");
+
+    // Verificamos si la respuesta contiene el rol
+    if (response && response.role) {
+      //console.log("Usuario con rol encontrado:", response.role.type);  // Inspecciona el rol
+      //("Usuario y rol:", response);  // Inspecciona la respuesta
+      return response;  // Retornamos la respuesta que incluye el rol
+    }
+
+    return null;  // Si no hay rol en la respuesta, retornamos null
   } catch (error) {
-    console.error("Error al obtener el usuario actual:", error)
-    return null
+    console.error("Error al obtener el usuario actual:", error);
+    return null;
+  }
+};
+
+// Función para verificar si un usuario es premium
+export const isPremiumUser = async (): Promise<boolean> => {
+  try {
+    const user = await getCurrentUser();
+    //console.log("Usuario actual:", user.role.type);  // Inspecciona el usuario
+    // Verificamos si el rol existe y si el tipo de rol es "premium"
+    if (user && user.role && user.role.type === "authenticated") {
+      //alert("El rol del usuario es autenticated")
+      // Si el rol tiene el tipo "premium", devolver true
+      return true;
+    }
+
+    // Si no es Premium
+    //alert("El rol del usuario no es premium")
+    return false;
+  } catch (error) {
+    console.error("Error al verificar si el usuario es premium:", error);
+    return false;
+  }
+};
+
+// Función para verificar si un usuario tiene acceso a una funcionalidad premium
+export const checkPremiumAccess = async (redirectIfNotPremium = true): Promise<boolean> => {
+  try {
+    const isPremium = await isPremiumUser()
+
+    if (!isPremium && redirectIfNotPremium && typeof window !== "undefined") {
+      // Redirigir a la página de planes premium
+      window.location.href = "/planes"
+      return false
+    }
+
+    return isPremium
+  } catch (error) {
+    console.error("Error al verificar acceso premium:", error)
+    return false
   }
 }
 
 // Función para obtener los datos del usuario
 export const getDatosUsuario = async (): Promise<DatoUsuario | null> => {
   if (!isAuthenticated()) {
-    return null
+    return null;
   }
 
   try {
-    const response = await fetchAPI("/api/dato-usuarios/me")
-    return response.data
+    const user = await getCurrentUser();
+    const id = user?.id;
+
+    if (!id) {
+      console.error("No se encontró la ID del usuario");
+      return null;
+    }
+
+    // Petición que trae los datos del usuario junto con la relación 'dato_usuarios'
+    const response = await fetchAPI(`/api/users/me?populate=dato_usuarios`);
+
+    const datos = response;
+
+    if (datos && datos.length > 0) {
+      //console.log("Datos del usuario:", datos[0]);
+      return datos[0]; // o datos[0].attributes si necesitas solo los atributos
+    } else {
+      console.error("No se encontraron datos en la relación dato_usuarios");
+      return null;
+    }
+
   } catch (error) {
-    console.error("Error al obtener los datos del usuario:", error)
-    return null
+    console.error("Error al obtener los datos del usuario:", error);
+    return null;
   }
-}
+};
 
 // Función para obtener los objetivos del usuario
 export const getObjetivosUsuario = async (): Promise<Objetivo | null> => {
   if (!isAuthenticated()) {
-    return null
+    return null;
   }
 
   try {
-    const response = await fetchAPI("/api/objetivos/me")
-    return response.data
+    const user = await getCurrentUser();
+    const id = user?.id;
+
+    if (!id) {
+      //console.error("No se encontró la ID del usuario");
+      return null;
+    }
+
+    // Petición que trae los objetivos del usuario junto con la relación 'objetivos'
+    const response = await fetchAPI(`/api/users/me?populate=objetivos`);
+
+    const objetivos = response?.objetivos;
+
+    if (objetivos && objetivos.length > 0) {
+      //console.log("objetivos del usuario:", objetivos[0]);
+      return objetivos[0]; // o objetivos[0].attributes si necesitas solo los atributos
+    } else {
+      console.error("No se encontraron objetivos en la relación objetivos");
+      return null;
+    }
+
   } catch (error) {
-    console.error("Error al obtener los objetivos del usuario:", error)
-    return null
+    console.error("Error al obtener los objetivos del usuario:", error);
+    return null;
+  }
+};
+
+// Función para guardar datos del usuario
+export const saveDatosUsuario = async (data: Partial<DatoUsuario>): Promise<any> => {
+  try {
+    // Verificar si el usuario ya tiene datos
+    const currentData = await getDatosUsuario()
+
+    if (currentData && currentData.documentId) {
+      // Actualizar datos existentes
+      const response = await fetchAPI(`/api/usuarios/${currentData.documentId}`, {
+        method: "PUT",
+        body: JSON.stringify({ data }),
+      })
+      return response
+    } else {
+      // Crear nuevos datos
+      const response = await fetchAPI("/api/usuarios", {
+        method: "POST",
+        body: JSON.stringify({ data }),
+      })
+      return response
+    }
+  } catch (error) {
+    console.error("Error al guardar datos del usuario:", error)
+    throw error
   }
 }
+
+// Función para guardar objetivos del usuario
+export const saveObjetivosUsuario = async (data: Partial<Objetivo>): Promise<any> => {
+  try {
+    // Verificar si el usuario ya tiene objetivos
+    const currentData = await getObjetivosUsuario()
+
+    if (currentData && currentData.documentId) {
+      // Actualizar objetivos existentes
+      const response = await fetchAPI(`/api/objetivos/${currentData.documentId}`, {
+        method: "PUT",
+        body: JSON.stringify({ data }),
+      })
+      return response
+    } else {
+      // Crear nuevos objetivos
+      const response = await fetchAPI("/api/objetivos", {
+        method: "POST",
+        body: JSON.stringify({ data }),
+      })
+      return response
+    }
+  } catch (error) {
+    console.error("Error al guardar objetivos del usuario:", error)
+    throw error
+  }
+}
+
 
 // Función para realizar peticiones a la API
 export const fetchAPI = async (endpoint: string, options: RequestInit = {}): Promise<any> => {
@@ -286,21 +453,6 @@ export const handleOAuthCallback = async (queryParams: URLSearchParams): Promise
   }
 }
 
-// Función para registrar un nuevo usuario
-export const register = async (username: string, email: string, password: string): Promise<any> => {
-  try {
-    const response = await fetchAPI("/api/auth/local/register", {
-      method: "POST",
-      body: JSON.stringify({ username, email, password }),
-    })
-
-    return response
-  } catch (error) {
-    console.error("Error al registrar usuario:", error)
-    throw error
-  }
-}
-
 // Modificar la función forgotPassword para manejar mejor las respuestas
 export const forgotPassword = async (email: string): Promise<any> => {
   try {
@@ -395,7 +547,7 @@ export const getAlimentos = async (params: Record<string, any> = {}): Promise<an
 
 // Función para obtener un alimento por ID
 export const getAlimento = async (id: number): Promise<any> => {
-  return fetchAPI(`/api/alimentos/${id}`)
+  return fetchAPI(`/api/alimentos?filters[id][$eq]=${id}`)
 }
 
 // Función para crear un alimento
@@ -410,18 +562,18 @@ export const createAlimento = async (data: any): Promise<any> => {
 export const updateAlimento = async (id: number, data: any): Promise<any> => {
   try {
     // Asegurarse de que estamos enviando solo los datos necesarios
-    const { nombre, calorias, proteinas, carbohidratos, grasas, fecha, tipo } = data
+    const { nombre, calorias, proteinas, grasas, fecha, carbohidratos, tipo } = data
 
     const updateData = {
       nombre,
       calorias,
-      proteinas,
       carbohidratos,
-      grasas,
+      proteinas,
       fecha,
       tipo,
+      grasas,
     }
-
+    //alert("ID de alimento a actualizar: " + id)
     const response = await fetchAPI(`/api/alimentos/${id}`, {
       method: "PUT",
       body: JSON.stringify({ data: updateData }),
@@ -471,7 +623,7 @@ export const getEjercicios = async (params: Record<string, any> = {}): Promise<a
 
 // Función para obtener un ejercicio por ID
 export const getEjercicio = async (id: number): Promise<any> => {
-  return fetchAPI(`/api/ejercicios/${id}`)
+  return fetchAPI(`/api/ejercicios?filters[id][$eq]=${id}`)
 }
 
 // Función para crear un ejercicio
@@ -486,7 +638,7 @@ export const createEjercicio = async (data: any): Promise<any> => {
 export const updateEjercicio = async (id: number, data: any): Promise<any> => {
   try {
     // Asegurarse de que estamos enviando solo los datos necesarios
-    const { nombre, series, repeticiones, peso, fecha, categoria } = data
+    const { nombre, series, repeticiones, peso, fecha, tipo, intensidad } = data
 
     const updateData = {
       nombre,
@@ -494,7 +646,8 @@ export const updateEjercicio = async (id: number, data: any): Promise<any> => {
       repeticiones,
       peso,
       fecha,
-      categoria,
+      tipo,
+      intensidad,
     }
 
     const response = await fetchAPI(`/api/ejercicios/${id}`, {
@@ -619,7 +772,7 @@ export const obtenerRecomendacionesIMC = (imc: number): string => {
   }
 }
 
-// Función para guardar los datos de la calculadora IMC
+// Función para guardar los datos de la calculadoras IMC
 export const guardarCalculadoraIMC = async (datos: {
   peso: number
   altura: number
@@ -627,10 +780,9 @@ export const guardarCalculadoraIMC = async (datos: {
   genero: string
   imc: number
   categoria: string
-  fecha: string
 }): Promise<any> => {
   try {
-    const response = await fetchAPI("/api/calculadora-imcs", {
+    const response = await fetchAPI("/api/calculadoras", {
       method: "POST",
       body: JSON.stringify({ data: datos }),
     })
@@ -653,121 +805,190 @@ export const getHistorialIMC = async (params: Record<string, any> = {}): Promise
 
   // Añadir parámetros de ordenación
   if (!params.sort) {
-    queryParams.append("sort", "fecha:desc")
+    queryParams.append("sort", "createdAt:desc")
   }
 
   const queryString = queryParams.toString() ? `?${queryParams.toString()}` : ""
 
-  return fetchAPI(`/api/calculadora-imcs${queryString}`)
+  return fetchAPI(`/api/calculadoras${queryString}`)
 }
 
-// Función para actualizar el perfil del usuario
-export const updateUserProfile = async (data: {
-  username?: string
-  email?: string
-  password?: string
-  currentPassword?: string
-}): Promise<any> => {
+// Función mejorada para obtener rutinas (solo del usuario actual)
+export const getRutinas = async (params: Record<string, any> = {}): Promise<any> => {
   try {
-    const response = await fetchAPI("/api/user/me", {
-      method: "PUT",
-      body: JSON.stringify(data),
+    const user = await getCurrentUser()
+    if (!user?.id) {
+      throw new Error("Usuario no autenticado")
+    }
+
+    const queryParams = new URLSearchParams()
+
+    // Añadir filtro por usuario usando el nuevo campo users_permissions_user
+    queryParams.append("filters[users_permissions_user][id][$eq]", user.id.toString())
+
+    // Añadir parámetros adicionales a la URL
+    Object.entries(params).forEach(([key, value]) => {
+      queryParams.append(key, String(value))
     })
 
-    return response
-  } catch (error) {
-    console.error("Error al actualizar perfil:", error)
-    throw error
-  }
-}
+    // Añadir populate para obtener datos relacionados
+    queryParams.append("populate[0]", "ejercicios")
+    queryParams.append("populate[1]", "users_permissions_user")
 
-// Función para guardar datos del usuario
-export const saveDatosUsuario = async (data: Partial<DatoUsuario>): Promise<any> => {
-  try {
-    // Verificar si el usuario ya tiene datos
-    const currentData = await getDatosUsuario()
+    const queryString = queryParams.toString() ? `?${queryParams.toString()}` : ""
 
-    if (currentData && currentData.id) {
-      // Actualizar datos existentes
-      const response = await fetchAPI(`/api/dato-usuarios/${currentData.id}`, {
-        method: "PUT",
-        body: JSON.stringify({ data }),
-      })
-      return response
-    } else {
-      // Crear nuevos datos
-      const response = await fetchAPI("/api/dato-usuarios", {
-        method: "POST",
-        body: JSON.stringify({ data }),
-      })
-      return response
+    const response = await fetchAPI(`/api/rutinas${queryString}`)
+
+    // Transformar la respuesta para que sea más fácil de usar
+    if (response && response.data) {
+      return {
+        data: response.data.map((item: any) => {
+          const attributes = item.attributes || {}
+
+          // Extraer ejercicios si existen
+          let ejercicios = []
+          if (attributes.ejercicios && attributes.ejercicios.data) {
+            ejercicios = attributes.ejercicios.data.map((ej: any) => ({
+              id: ej.id,
+              ...ej.attributes,
+            }))
+          }
+
+          return {
+            id: item.id,
+            nombre: item.nombre || "",
+            descripcion: item.descripcion || "",
+            diasSemana: item.diasSemana || null,
+            //ejercicios: item.ejercicios,
+            ejercicios: ejercicios,
+            users_permissions_user: attributes.users_permissions_user?.data?.id || null,
+          }
+        }),
+      }
     }
+
+    return { data: [] }
   } catch (error) {
-    console.error("Error al guardar datos del usuario:", error)
+    console.error("Error al obtener rutinas:", error)
     throw error
   }
 }
 
-// Función para guardar objetivos del usuario
-export const saveObjetivosUsuario = async (data: Partial<Objetivo>): Promise<any> => {
+// Función mejorada para obtener una rutina por ID
+export const getRutina = async (documentId: string): Promise<any> => {
   try {
-    // Verificar si el usuario ya tiene objetivos
-    const currentData = await getObjetivosUsuario()
-
-    if (currentData && currentData.id) {
-      // Actualizar objetivos existentes
-      const response = await fetchAPI(`/api/objetivos/${currentData.id}`, {
-        method: "PUT",
-        body: JSON.stringify({ data }),
-      })
-      return response
-    } else {
-      // Crear nuevos objetivos
-      const response = await fetchAPI("/api/objetivos", {
-        method: "POST",
-        body: JSON.stringify({ data }),
-      })
-      return response
+    const user = await getCurrentUser()
+    if (!user?.id) {
+      throw new Error("Usuario no autenticado")
     }
+    alert("ID de la rutina a obtener: " + documentId)
+
+    const response = await fetchAPI(`/api/rutinas/${documentId}`)
+    console.log("Respuesta de la rutina:", response)
+    if (response && response.data) {
+      const attributes = response.data.attributes || {}
+
+      // Extraer ejercicios si existen
+      let ejercicios = []
+      if (attributes.ejercicios && attributes.ejercicios.data) {
+        ejercicios = attributes.ejercicios.data.map((ej: any) => ({
+          id: ej.id,
+          ...ej.attributes,
+        }))
+      }
+
+      return {
+        data: {
+          documentId: response.data.documentId,
+          nombre: attributes.nombre || "",
+          descripcion: attributes.descripcion || "",
+          diasSemana: attributes.diasSemana || null,
+          ejercicios: ejercicios,
+        },
+      }
+    }
+
+    return { data: null }
   } catch (error) {
-    console.error("Error al guardar objetivos del usuario:", error)
+    console.error("Error al obtener rutina:", error)
     throw error
   }
 }
 
-// Función para obtener rutinas
-export const getRutinas = async (params: Record<string, any> = {}): Promise<any> => {
-  const queryParams = new URLSearchParams()
-
-  // Añadir parámetros a la URL
-  Object.entries(params).forEach(([key, value]) => {
-    queryParams.append(key, String(value))
-  })
-
-  const queryString = queryParams.toString() ? `?${queryParams.toString()}` : ""
-
-  return fetchAPI(`/api/rutinas${queryString}`)
-}
-
-// Función para obtener una rutina por ID
-export const getRutina = async (id: number): Promise<any> => {
-  return fetchAPI(`/api/rutinas/${id}`)
-}
-
-// Función para crear una rutina
+// Función mejorada para crear una rutina
 export const createRutina = async (data: any): Promise<any> => {
-  return fetchAPI("/api/rutinas", {
-    method: "POST",
-    body: JSON.stringify({ data }),
-  })
+  try {
+    const user = await getCurrentUser()
+    if (!user?.id) {
+      throw new Error("Usuario no autenticado")
+    }
+
+    // Validar datos mínimos
+    if (!data.nombre) {
+      throw new Error("El nombre de la rutina es obligatorio")
+    }
+
+    // Preparar los datos para enviar
+    const rutinaData = {
+      nombre: data.nombre,
+      descripcion: data.descripcion || "",
+      diasSemana: data.diasSemana || null,
+      users_permissions_user: user.id,
+    }
+
+    const response = await fetchAPI("/api/rutinas", {
+      method: "POST",
+      body: JSON.stringify({ data: rutinaData }),
+    })
+
+    // Verificar que la creación fue exitosa
+    if (!response || !response.data) {
+      throw new Error("No se pudo crear la rutina")
+    }
+
+    // Transformar la respuesta para que sea más fácil de usar
+    const attributes = response.data.attributes || {}
+
+    return {
+      data: {
+        id: response.data.id,
+        nombre: attributes.nombre || "",
+        descripcion: attributes.descripcion || "",
+        diasSemana: attributes.diasSemana || null,
+        ejercicios: [],
+        users_permissions_user: attributes.users_permissions_user?.data?.id || user.id,
+      },
+    }
+  } catch (error) {
+    console.error("Error al crear rutina:", error)
+    throw error
+  }
 }
 
-// Función para actualizar una rutina
-export const updateRutina = async (id: number, data: any): Promise<any> => {
+// Función mejorada para actualizar una rutina
+export const updateRutina = async (documentId: string, data: any): Promise<any> => {
   try {
-    const response = await fetchAPI(`/api/rutinas/${id}`, {
+    const user = await getCurrentUser()
+    if (!user?.id) {
+      throw new Error("Usuario no autenticado")
+    }
+
+    // Verificar que la rutina pertenece al usuario
+    const rutina = await getRutina(documentId)
+    if (!rutina || !rutina.data || rutina.data.users_permissions_user !== user.id) {
+      throw new Error("No tienes permiso para actualizar esta rutina")
+    }
+
+    // Preparar los datos para actualizar
+    const updateData = {
+      nombre: data.nombre,
+      descripcion: data.descripcion || "",
+      diasSemana: data.diasSemana || null,
+    }
+
+    const response = await fetchAPI(`/api/rutinas/${documentId}`, {
       method: "PUT",
-      body: JSON.stringify({ data }),
+      body: JSON.stringify({ data: updateData }),
     })
 
     // Verificar que la actualización fue exitosa
@@ -775,30 +996,43 @@ export const updateRutina = async (id: number, data: any): Promise<any> => {
       throw new Error("No se pudo actualizar la rutina")
     }
 
-    return response
+    // Obtener la rutina actualizada con todos sus datos
+    return getRutina(documentId)
   } catch (error) {
     console.error("Error al actualizar rutina:", error)
     throw error
   }
 }
 
-// Función para eliminar una rutina
-export const deleteRutina = async (id: number): Promise<any> => {
+// Función mejorada para eliminar una rutina
+export const deleteRutina = async (documentId: number): Promise<any> => {
   try {
-    await fetchAPI(`/api/rutinas/${id}`, {
+    const user = await getCurrentUser()
+    if (!user?.id) {
+      throw new Error("Usuario no autenticado")
+    }
+
+    // Verificar que la rutina pertenece al usuario
+    const rutina = await getRutina(documentId)
+    if (!rutina || !rutina.data || rutina.data.users_permissions_user !== user.id) {
+      throw new Error("No tienes permiso para eliminar esta rutina")
+    }
+
+    await fetchAPI(`/api/rutinas/${documentId}`, {
       method: "DELETE",
     })
 
-    // En Strapi, una eliminación exitosa generalmente devuelve un 200 OK
-    // Si llegamos aquí, consideramos que la eliminación fue exitosa
-    return { success: true, id }
+    return {
+      success: true,
+      documentId,
+    }
   } catch (error) {
     console.error("Error al eliminar rutina:", error)
     throw error
   }
 }
 
-// Función para añadir un ejercicio a una rutina
+// Función mejorada para añadir un ejercicio a una rutina
 export const addEjercicioToRutina = async (
   rutinaId: number,
   ejercicioId: number,
@@ -806,83 +1040,96 @@ export const addEjercicioToRutina = async (
   repeticiones: number,
   peso: number,
   descanso: number,
-  orden: number,
 ): Promise<any> => {
   try {
-    // Primero obtenemos la rutina actual
-    const rutina = await getRutina(rutinaId)
-
-    // Creamos el nuevo ejercicio para la rutina
-    const nuevoEjercicio = {
-      ejercicio: ejercicioId,
-      series,
-      repeticiones,
-      peso,
-      descanso,
-      orden,
+    const user = await getCurrentUser()
+    if (!user?.id) {
+      throw new Error("Usuario no autenticado")
     }
 
-    // Añadimos el ejercicio a la lista de ejercicios de la rutina
-    const ejerciciosActualizados = [...(rutina.data.ejercicios || []), nuevoEjercicio]
+    // Verificar que la rutina existe y pertenece al usuario
+    const rutinaResponse = await getRutina(rutinaId)
+    if (!rutinaResponse || !rutinaResponse.data) {
+      throw new Error("La rutina no existe o no tienes permiso para modificarla")
+    }
 
-    // Actualizamos la rutina con la nueva lista de ejercicios
-    return updateRutina(rutinaId, { ejercicios: ejerciciosActualizados })
+    // Verificar que el ejercicio existe
+    const ejercicioResponse = await getEjercicio(ejercicioId)
+    if (!ejercicioResponse || !ejercicioResponse.data) {
+      throw new Error("El ejercicio no existe")
+    }
+
+    // En Strapi v4, para añadir una relación, usamos el endpoint específico para relaciones
+    // La URL correcta es /api/rutinas/{id}/relationships/ejercicios
+    const response = await fetchAPI(`/api/rutinas/${rutinaId}/ejercicios`, {
+      method: "POST",
+      body: JSON.stringify({
+        data: [ejercicioId],
+      }),
+    })
+
+    console.log("Respuesta de añadir ejercicio:", response)
+
+    // Después de añadir la relación, obtenemos la rutina actualizada
+    return getRutina(rutinaId)
   } catch (error) {
     console.error("Error al añadir ejercicio a la rutina:", error)
     throw error
   }
 }
 
-// Función para eliminar un ejercicio de una rutina
+// Función mejorada para eliminar un ejercicio de una rutina
 export const removeEjercicioFromRutina = async (rutinaId: number, ejercicioIndex: number): Promise<any> => {
   try {
-    // Primero obtenemos la rutina actual
+    const user = await getCurrentUser()
+    if (!user?.id) {
+      throw new Error("Usuario no autenticado")
+    }
+
+    // Verificar que la rutina pertenece al usuario
     const rutina = await getRutina(rutinaId)
+    if (!rutina || !rutina.data || rutina.data.users_permissions_user !== user.id) {
+      throw new Error("No tienes permiso para modificar esta rutina")
+    }
 
-    // Filtramos el ejercicio que queremos eliminar
-    const ejerciciosActualizados = rutina.data.ejercicios.filter((_: any, index: number) => index !== ejercicioIndex)
+    // Verificar que el ejercicio existe en la rutina
+    if (!rutina.data.ejercicios || !rutina.data.ejercicios[ejercicioIndex]) {
+      throw new Error("El ejercicio no existe en la rutina")
+    }
 
-    // Actualizamos la rutina con la nueva lista de ejercicios
-    return updateRutina(rutinaId, { ejercicios: ejerciciosActualizados })
+    const ejercicioId = rutina.data.ejercicios[ejercicioIndex].id
+
+    // En Strapi v4, para eliminar una relación, usamos el endpoint de relaciones
+    await fetchAPI(`/api/rutinas/${rutinaId}/ejercicios/${ejercicioId}`, {
+      method: "DELETE",
+    })
+
+    // Después de eliminar la relación, obtenemos la rutina actualizada
+    return getRutina(rutinaId)
   } catch (error) {
     console.error("Error al eliminar ejercicio de la rutina:", error)
     throw error
   }
 }
 
-// Función para verificar si un usuario es premium
-export const isPremiumUser = async (): Promise<boolean> => {
+export const updateUserRole = async (userId: number, roleId: string): Promise<any> => {
   try {
-    if (!isAuthenticated()) {
-      return false
-    }
+    console.log(`Actualizando rol del usuario ${userId} a ${roleId}`)
 
-    const user = await getCurrentUser()
+    // Llamada directa a la API de Strapi para actualizar el rol
+    const response = await fetchAPI(`/api/users/${userId}`, {
+      method: "PUT",
+      body: JSON.stringify({
+        role: {
+          documentId: roleId,
+        }
+      }),
+    })
 
-    // Aquí implementamos la lógica para determinar si un usuario es premium
-    // Por ejemplo, podría ser un campo en el perfil del usuario
-    // Por ahora, simulamos que todos los usuarios autenticados son premium
-    return true
+    console.log("Respuesta de actualización de rol:", response)
+    return response
   } catch (error) {
-    console.error("Error al verificar si el usuario es premium:", error)
-    return false
-  }
-}
-
-// Función para verificar si un usuario tiene acceso a una funcionalidad premium
-export const checkPremiumAccess = async (redirectIfNotPremium = true): Promise<boolean> => {
-  try {
-    const isPremium = await isPremiumUser()
-
-    if (!isPremium && redirectIfNotPremium && typeof window !== "undefined") {
-      // Redirigir a la página de planes premium
-      window.location.href = "/planes"
-      return false
-    }
-
-    return isPremium
-  } catch (error) {
-    console.error("Error al verificar acceso premium:", error)
-    return false
+    console.error("Error al actualizar rol de usuario:", error)
+    throw error
   }
 }

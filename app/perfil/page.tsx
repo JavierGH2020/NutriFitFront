@@ -1,7 +1,5 @@
 "use client"
 
-import type React from "react"
-
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { User, Save, Loader2, LineChart, Target, Calculator, Dumbbell, Utensils, AlertCircle } from "lucide-react"
@@ -23,31 +21,32 @@ import {
   getHistorialEjercicios,
   updateUserProfile,
   isPremiumUser,
-  type User as UserType,
-  type DatoUsuario,
-  type Objetivo,
 } from "@/lib/api"
 import AuthGuard from "@/components/auth-guard"
-import { format, subMonths } from "date-fns"
+import { format } from "date-fns"
 import { es } from "date-fns/locale"
 import { useToast } from "@/hooks/use-toast"
 
 export default function PerfilPage() {
   const router = useRouter()
   const { toast } = useToast()
-  const [user, setUser] = useState<UserType | null>(null)
-  const [datos, setDatos] = useState<DatoUsuario | null>(null)
-  const [objetivos, setObjetivos] = useState<Objetivo | null>(null)
-  const [imcHistorial, setImcHistorial] = useState<any[]>([])
-  const [alimentosRecientes, setAlimentosRecientes] = useState<any[]>([])
-  const [ejerciciosRecientes, setEjerciciosRecientes] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
-  const [isPremium, setIsPremium] = useState(false)
 
-  // Formulario
+  // Estados para los datos del usuario
+  const [userData, setUserData] = useState({
+    user: null,
+    datos: null,
+    objetivos: null,
+    imcHistorial: [],
+    alimentosRecientes: [],
+    ejerciciosRecientes: [],
+    isPremium: false,
+  })
+
+  // Estado para el formulario
   const [formData, setFormData] = useState({
     username: "",
     email: "",
@@ -56,79 +55,59 @@ export default function PerfilPage() {
     confirmPassword: "",
   })
 
-  // Cargar datos del usuario
-  useEffect(() => {
-    const fetchUserData = async () => {
-      setIsLoading(true)
-      setError(null)
-      try {
-        // Verificar si el usuario es premium
-        const premium = await isPremiumUser()
-        setIsPremium(premium)
+  // Función para cargar todos los datos del usuario
+  const loadUserData = async () => {
+    setIsLoading(true)
+    setError(null)
 
-        // Obtener datos del usuario
-        const userData = await getCurrentUser()
-        setUser(userData)
+    try {
+      // Cargar datos en paralelo para mejorar el rendimiento
+      const [isPremium, user, datos, objetivos, imcResponse, alimentosResponse, ejerciciosResponse] = await Promise.all(
+        [
+          isPremiumUser(),
+          getCurrentUser(),
+          getDatosUsuario(),
+          getObjetivosUsuario(),
+          getHistorialIMC(),
+          getHistorialAlimentos({ sort: "fecha:desc", "pagination[limit]": 5 }),
+          getHistorialEjercicios({ sort: "fecha:desc", "pagination[limit]": 5 }),
+        ],
+      )
 
-        if (userData) {
-          setFormData({
-            ...formData,
-            username: userData.username || "",
-            email: userData.email || "",
-          })
-        }
+      // Actualizar el estado con todos los datos
+      setUserData({
+        user,
+        datos,
+        objetivos,
+        imcHistorial: imcResponse.data || [],
+        alimentosRecientes: alimentosResponse.data || [],
+        ejerciciosRecientes: ejerciciosResponse.data || [],
+        isPremium,
+      })
 
-        // Obtener datos personales
-        const datosUsuario = await getDatosUsuario()
-        setDatos(datosUsuario)
-
-        // Obtener objetivos
-        const objetivosUsuario = await getObjetivosUsuario()
-        setObjetivos(objetivosUsuario)
-
-        // Obtener historial de IMC (últimos 6 meses)
-        const fechaInicio = format(subMonths(new Date(), 6), "yyyy-MM-dd")
-        const fechaFin = format(new Date(), "yyyy-MM-dd")
-
-        const imcParams = {
-          "filters[fecha][$gte]": fechaInicio,
-          "filters[fecha][$lte]": fechaFin,
-          sort: "fecha:desc",
-          "pagination[limit]": 10,
-        }
-
-        const imcResponse = await getHistorialIMC(imcParams)
-        setImcHistorial(imcResponse.data || [])
-
-        // Obtener alimentos recientes (últimos 5)
-        const alimentosParams = {
-          sort: "fecha:desc",
-          "pagination[limit]": 5,
-        }
-
-        const alimentosResponse = await getHistorialAlimentos(alimentosParams)
-        setAlimentosRecientes(alimentosResponse.data || [])
-
-        // Obtener ejercicios recientes (últimos 5)
-        const ejerciciosParams = {
-          sort: "fecha:desc",
-          "pagination[limit]": 5,
-        }
-
-        const ejerciciosResponse = await getHistorialEjercicios(ejerciciosParams)
-        setEjerciciosRecientes(ejerciciosResponse.data || [])
-      } catch (err) {
-        console.error("Error al cargar datos del usuario:", err)
-        setError("No se pudieron cargar tus datos. Por favor, inténtalo de nuevo.")
-      } finally {
-        setIsLoading(false)
+      // Actualizar el formulario con los datos del usuario
+      if (user) {
+        setFormData({
+          ...formData,
+          username: user.username || "",
+          email: user.email || "",
+        })
       }
+    } catch (err) {
+      console.error("Error al cargar datos del usuario:", err)
+      setError("No se pudieron cargar tus datos. Por favor, inténtalo de nuevo.")
+    } finally {
+      setIsLoading(false)
     }
+  }
 
-    fetchUserData()
+  // Cargar datos al montar el componente
+  useEffect(() => {
+    loadUserData()
   }, [])
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Manejar cambios en el formulario
+  const handleInputChange = (e) => {
     const { name, value } = e.target
     setFormData({
       ...formData,
@@ -136,71 +115,9 @@ export default function PerfilPage() {
     })
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError(null)
-    setSuccess(null)
-    setIsSaving(true)
-
-    // Validar contraseñas si se está cambiando
-    if (formData.password && formData.password !== formData.confirmPassword) {
-      setError("Las contraseñas no coinciden")
-      setIsSaving(false)
-      return
-    }
-
-    try {
-      // Preparar datos para actualizar
-      const updateData: any = {
-        username: formData.username,
-        email: formData.email,
-      }
-
-      // Solo incluir contraseñas si se están cambiando
-      if (formData.password && formData.currentPassword) {
-        updateData.password = formData.password
-        updateData.currentPassword = formData.currentPassword
-      }
-
-      await updateUserProfile(updateData)
-
-      // Actualizar datos locales
-      if (user) {
-        setUser({
-          ...user,
-          username: formData.username,
-          email: formData.email,
-        })
-      }
-
-      setSuccess("Perfil actualizado correctamente")
-
-      toast({
-        title: "Perfil actualizado",
-        description: "Tu perfil ha sido actualizado correctamente.",
-      })
-
-      // Limpiar campos de contraseña
-      setFormData({
-        ...formData,
-        currentPassword: "",
-        password: "",
-        confirmPassword: "",
-      })
-    } catch (err: any) {
-      console.error("Error al actualizar perfil:", err)
-      if (err.message && err.message.includes("password")) {
-        setError("La contraseña actual es incorrecta")
-      } else {
-        setError("Error al actualizar el perfil. Por favor, inténtalo de nuevo.")
-      }
-    } finally {
-      setIsSaving(false)
-    }
-  }
-
   // Obtener las iniciales del usuario para el avatar
-  const getUserInitials = (): string => {
+  const getUserInitials = () => {
+    const { user } = userData
     if (!user || !user.username) {
       return user?.email?.charAt(0).toUpperCase() || "U"
     }
@@ -208,10 +125,10 @@ export default function PerfilPage() {
   }
 
   // Determinar si el usuario inició sesión con Google
-  const isGoogleUser = user?.provider === "google" || user?.provider === undefined
+  const isGoogleUser = userData.user?.provider === "google" || userData.user?.provider === undefined
 
   // Obtener el último IMC registrado
-  const ultimoIMC = imcHistorial.length > 0 ? imcHistorial[0] : null
+  const ultimoIMC = userData.imcHistorial.length > 0 ? userData.imcHistorial[0] : null
 
   return (
     <AuthGuard>
@@ -244,53 +161,59 @@ export default function PerfilPage() {
                 <CardHeader>
                   <div className="flex flex-col items-center">
                     <Avatar className="h-24 w-24 mb-4">
-                      {isGoogleUser && user ? (
-                        <AvatarImage alt={user.username || "Usuario"} />
+                      {isGoogleUser && userData.user?.image ? (
+                        <AvatarImage src={userData.user.image} alt={userData.user.username || "Usuario"} />
                       ) : (
                         <AvatarFallback className="text-2xl bg-primary text-primary-foreground">
                           {getUserInitials()}
                         </AvatarFallback>
                       )}
                     </Avatar>
-                    <CardTitle className="text-center">{user?.username || "Usuario"}</CardTitle>
-                    <CardDescription className="text-center">{user?.email}</CardDescription>
+                    <CardTitle className="text-center">{userData.user?.username || "Usuario"}</CardTitle>
+                    <CardDescription className="text-center">{userData.user?.email}</CardDescription>
 
                     {/* Mostrar badge de tipo de cuenta */}
-                    <Badge className={`mt-2 ${isPremium ? "bg-primary" : ""}`}>
-                      {isPremium ? "Cuenta Premium" : "Cuenta Básica"}
+                    <Badge className={`mt-2 ${userData.isPremium ? "bg-primary" : ""}`}>
+                      {userData.isPremium ? "Cuenta Premium" : "Cuenta Básica"}
                     </Badge>
                   </div>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {datos && (
+                    {userData.datos && (
                       <>
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Edad:</span>
-                          <span className="font-medium">{datos.edad || "No especificada"}</span>
+                          <span className="font-medium">{userData.datos.edad || "No especificada"}</span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Género:</span>
-                          <span className="font-medium capitalize">{datos.genero || "No especificado"}</span>
+                          <span className="font-medium capitalize">{userData.datos.genero || "No especificado"}</span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Peso actual:</span>
-                          <span className="font-medium">{datos.peso ? `${datos.peso} kg` : "No especificado"}</span>
+                          <span className="font-medium">
+                            {userData.datos.peso ? `${userData.datos.peso} kg` : "No especificado"}
+                          </span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Altura:</span>
-                          <span className="font-medium">{datos.altura ? `${datos.altura} cm` : "No especificada"}</span>
+                          <span className="font-medium">
+                            {userData.datos.altura ? `${userData.datos.altura} cm` : "No especificada"}
+                          </span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Nivel de actividad:</span>
-                          <span className="font-medium capitalize">{datos.nivelActividad || "No especificado"}</span>
+                          <span className="font-medium capitalize">
+                            {userData.datos.nivelActividad || "No especificado"}
+                          </span>
                         </div>
                       </>
                     )}
 
                     <Separator />
 
-                    {objetivos && (
+                    {userData.objetivos && (
                       <>
                         <div className="pt-2">
                           <h3 className="font-semibold flex items-center mb-2">
@@ -300,18 +223,22 @@ export default function PerfilPage() {
                           <div className="space-y-2">
                             <div className="flex justify-between">
                               <span className="text-muted-foreground">Plan:</span>
-                              <span className="font-medium capitalize">{objetivos.plan || "No especificado"}</span>
+                              <span className="font-medium capitalize">
+                                {userData.objetivos.plan || "No especificado"}
+                              </span>
                             </div>
                             <div className="flex justify-between">
                               <span className="text-muted-foreground">Peso deseado:</span>
                               <span className="font-medium">
-                                {objetivos.pesoDeseado ? `${objetivos.pesoDeseado} kg` : "No especificado"}
+                                {userData.objetivos.pesoDeseado
+                                  ? `${userData.objetivos.pesoDeseado} kg`
+                                  : "No especificado"}
                               </span>
                             </div>
                             <div className="flex justify-between">
                               <span className="text-muted-foreground">Entrenamientos semanales:</span>
                               <span className="font-medium">
-                                {objetivos.entrenamientosSemanales || "No especificado"}
+                                {userData.objetivos.entrenamientosSemanales || "No especificado"}
                               </span>
                             </div>
                           </div>
@@ -330,9 +257,6 @@ export default function PerfilPage() {
                         <div className="flex flex-col items-center justify-center space-y-2 rounded-lg bg-muted p-4 text-center">
                           <span className="text-3xl font-bold">{ultimoIMC.imc}</span>
                           <span className="text-sm font-semibold text-primary">{ultimoIMC.categoria}</span>
-                          <span className="text-xs text-muted-foreground">
-                            {format(new Date(ultimoIMC.fecha), "PPP", { locale: es })}
-                          </span>
                         </div>
                       </div>
                     )}
@@ -353,12 +277,8 @@ export default function PerfilPage() {
 
             {/* Columna derecha - Tabs con formulario y resumen */}
             <div className="md:col-span-2">
-              <Tabs defaultValue="cuenta">
-                <TabsList className="grid w-full grid-cols-3">
-                  <TabsTrigger value="cuenta">
-                    <User className="h-4 w-4 mr-2" />
-                    Cuenta
-                  </TabsTrigger>
+              <Tabs defaultValue="actividad">
+                <TabsList className="grid w-full grid-cols-2">
                   <TabsTrigger value="actividad">
                     <LineChart className="h-4 w-4 mr-2" />
                     Actividad reciente
@@ -368,100 +288,6 @@ export default function PerfilPage() {
                     Progreso
                   </TabsTrigger>
                 </TabsList>
-
-                {/* Tab de Cuenta */}
-                <TabsContent value="cuenta">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Información de la cuenta</CardTitle>
-                      <CardDescription>Actualiza tu información personal y contraseña</CardDescription>
-                    </CardHeader>
-                    <form onSubmit={handleSubmit}>
-                      <CardContent className="space-y-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="username">Nombre de usuario</Label>
-                          <Input
-                            id="username"
-                            name="username"
-                            value={formData.username}
-                            onChange={handleInputChange}
-                            disabled={isGoogleUser || isSaving}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="email">Email</Label>
-                          <Input
-                            id="email"
-                            name="email"
-                            type="email"
-                            value={formData.email}
-                            onChange={handleInputChange}
-                            disabled={isGoogleUser || isSaving}
-                          />
-                        </div>
-
-                        {!isGoogleUser && (
-                          <>
-                            <Separator />
-                            <div className="pt-2">
-                              <h3 className="font-semibold mb-4">Cambiar contraseña</h3>
-                              <div className="space-y-4">
-                                <div className="space-y-2">
-                                  <Label htmlFor="currentPassword">Contraseña actual</Label>
-                                  <Input
-                                    id="currentPassword"
-                                    name="currentPassword"
-                                    type="password"
-                                    value={formData.currentPassword}
-                                    onChange={handleInputChange}
-                                    disabled={isSaving}
-                                  />
-                                </div>
-                                <div className="space-y-2">
-                                  <Label htmlFor="password">Nueva contraseña</Label>
-                                  <Input
-                                    id="password"
-                                    name="password"
-                                    type="password"
-                                    value={formData.password}
-                                    onChange={handleInputChange}
-                                    disabled={isSaving}
-                                  />
-                                </div>
-                                <div className="space-y-2">
-                                  <Label htmlFor="confirmPassword">Confirmar nueva contraseña</Label>
-                                  <Input
-                                    id="confirmPassword"
-                                    name="confirmPassword"
-                                    type="password"
-                                    value={formData.confirmPassword}
-                                    onChange={handleInputChange}
-                                    disabled={isSaving}
-                                  />
-                                </div>
-                              </div>
-                            </div>
-                          </>
-                        )}
-                      </CardContent>
-                      <CardFooter>
-                        <Button type="submit" disabled={isSaving || isGoogleUser}>
-                          {isSaving ? (
-                            <>
-                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              Guardando...
-                            </>
-                          ) : (
-                            <>
-                              <Save className="mr-2 h-4 w-4" />
-                              Guardar cambios
-                            </>
-                          )}
-                        </Button>
-                      </CardFooter>
-                    </form>
-                  </Card>
-                </TabsContent>
 
                 {/* Tab de Actividad Reciente */}
                 <TabsContent value="actividad">
@@ -478,15 +304,15 @@ export default function PerfilPage() {
                             <Utensils className="h-4 w-4 mr-2 text-primary" />
                             Últimos alimentos registrados
                           </h3>
-                          {alimentosRecientes.length === 0 ? (
+                          {userData.alimentosRecientes.length === 0 ? (
                             <p className="text-muted-foreground text-center py-4">
                               No hay alimentos registrados recientemente
                             </p>
                           ) : (
                             <div className="space-y-2">
-                              {alimentosRecientes.map((alimento) => (
+                              {userData.alimentosRecientes.map((alimento) => (
                                 <div
-                                  key={alimento.id}
+                                  key={alimento.id || alimento.documentId}
                                   className="flex justify-between items-center p-3 rounded-lg border"
                                 >
                                   <div>
@@ -517,15 +343,15 @@ export default function PerfilPage() {
                             <Dumbbell className="h-4 w-4 mr-2 text-primary" />
                             Últimos ejercicios registrados
                           </h3>
-                          {ejerciciosRecientes.length === 0 ? (
+                          {userData.ejerciciosRecientes.length === 0 ? (
                             <p className="text-muted-foreground text-center py-4">
                               No hay ejercicios registrados recientemente
                             </p>
                           ) : (
                             <div className="space-y-2">
-                              {ejerciciosRecientes.map((ejercicio) => (
+                              {userData.ejerciciosRecientes.map((ejercicio) => (
                                 <div
-                                  key={ejercicio.id}
+                                  key={ejercicio.id || ejercicio.documentId}
                                   className="flex justify-between items-center p-3 rounded-lg border"
                                 >
                                   <div>
@@ -540,7 +366,7 @@ export default function PerfilPage() {
                                     <p className="font-medium">
                                       {ejercicio.series} x {ejercicio.repeticiones}
                                     </p>
-                                    <p className="text-xs text-muted-foreground capitalize">{ejercicio.categoria}</p>
+                                    <p className="text-xs text-muted-foreground capitalize">{ejercicio.tipo}</p>
                                   </div>
                                 </div>
                               ))}
@@ -579,7 +405,7 @@ export default function PerfilPage() {
                             <Calculator className="h-4 w-4 mr-2 text-primary" />
                             Historial de IMC
                           </h3>
-                          {imcHistorial.length === 0 ? (
+                          {userData.imcHistorial.length === 0 ? (
                             <p className="text-muted-foreground text-center py-4">No hay registros de IMC</p>
                           ) : (
                             <div className="space-y-4">
@@ -587,16 +413,14 @@ export default function PerfilPage() {
                                 <table className="w-full">
                                   <thead>
                                     <tr className="border-b">
-                                      <th className="text-left py-2">Fecha</th>
                                       <th className="text-center py-2">IMC</th>
                                       <th className="text-center py-2">Peso</th>
                                       <th className="text-right py-2">Categoría</th>
                                     </tr>
                                   </thead>
                                   <tbody>
-                                    {imcHistorial.map((registro) => (
-                                      <tr key={registro.id} className="border-b">
-                                        <td className="py-2">{format(new Date(registro.fecha), "dd/MM/yyyy")}</td>
+                                    {userData.imcHistorial.map((registro) => (
+                                      <tr key={registro.id || registro.documentId} className="border-b">
                                         <td className="text-center py-2 font-medium">{registro.imc}</td>
                                         <td className="text-center py-2">{registro.peso} kg</td>
                                         <td className="text-right py-2">
@@ -619,44 +443,49 @@ export default function PerfilPage() {
                               </div>
 
                               {/* Progreso hacia el objetivo */}
-                              {objetivos && objetivos.pesoDeseado && datos && datos.peso && (
-                                <div className="mt-6">
-                                  <h4 className="text-sm font-medium mb-2">Progreso hacia tu peso objetivo</h4>
-                                  <div className="space-y-2">
-                                    <div className="flex justify-between text-sm">
-                                      <span>Peso actual: {datos.peso} kg</span>
-                                      <span>Objetivo: {objetivos.pesoDeseado} kg</span>
+                              {userData.objetivos &&
+                                userData.objetivos.pesoDeseado &&
+                                userData.datos &&
+                                userData.datos.peso && (
+                                  <div className="mt-6">
+                                    <h4 className="text-sm font-medium mb-2">Progreso hacia tu peso objetivo</h4>
+                                    <div className="space-y-2">
+                                      <div className="flex justify-between text-sm">
+                                        <span>Peso actual: {userData.datos.peso} kg</span>
+                                        <span>Objetivo: {userData.objetivos.pesoDeseado} kg</span>
+                                      </div>
+                                      <div className="w-full bg-muted rounded-full h-2.5">
+                                        <div
+                                          className="bg-primary h-2.5 rounded-full"
+                                          style={{
+                                            width: `${Math.min(
+                                              100,
+                                              Math.max(
+                                                0,
+                                                userData.datos.peso > userData.objetivos.pesoDeseado
+                                                  ? 100 -
+                                                  ((userData.datos.peso - userData.objetivos.pesoDeseado) /
+                                                    (userData.datos.peso * 0.2)) *
+                                                  100
+                                                  : 100 -
+                                                  ((userData.objetivos.pesoDeseado - userData.datos.peso) /
+                                                    (userData.objetivos.pesoDeseado * 0.2)) *
+                                                  100,
+                                              ),
+                                            )}%`,
+                                          }}
+                                        ></div>
+                                      </div>
+                                      <p className="text-xs text-muted-foreground">
+                                        {userData.datos.peso > userData.objetivos.pesoDeseado
+                                          ? `Te faltan ${(userData.datos.peso - userData.objetivos.pesoDeseado).toFixed(1)} kg para alcanzar tu objetivo`
+                                          : userData.datos.peso < userData.objetivos.pesoDeseado
+                                            ? `Te faltan ${(userData.objetivos.pesoDeseado - userData.datos.peso).toFixed(1)} kg para alcanzar tu objetivo`
+                                            : "¡Has alcanzado tu objetivo de peso!"}
+                                      </p>
                                     </div>
-                                    <div className="w-full bg-muted rounded-full h-2.5">
-                                      <div
-                                        className="bg-primary h-2.5 rounded-full"
-                                        style={{
-                                          width: `${Math.min(
-                                            100,
-                                            Math.max(
-                                              0,
-                                              datos.peso > objetivos.pesoDeseado
-                                                ? 100 -
-                                                ((datos.peso - objetivos.pesoDeseado) / (datos.peso * 0.2)) * 100
-                                                : 100 -
-                                                ((objetivos.pesoDeseado - datos.peso) /
-                                                  (objetivos.pesoDeseado * 0.2)) *
-                                                100,
-                                            ),
-                                          )}%`,
-                                        }}
-                                      ></div>
-                                    </div>
-                                    <p className="text-xs text-muted-foreground">
-                                      {datos.peso > objetivos.pesoDeseado
-                                        ? `Te faltan ${(datos.peso - objetivos.pesoDeseado).toFixed(1)} kg para alcanzar tu objetivo`
-                                        : datos.peso < objetivos.pesoDeseado
-                                          ? `Te faltan ${(objetivos.pesoDeseado - datos.peso).toFixed(1)} kg para alcanzar tu objetivo`
-                                          : "¡Has alcanzado tu objetivo de peso!"}
-                                    </p>
                                   </div>
-                                </div>
-                              )}
+                                )}
                             </div>
                           )}
                         </div>
@@ -678,4 +507,3 @@ export default function PerfilPage() {
     </AuthGuard>
   )
 }
-
