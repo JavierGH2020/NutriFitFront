@@ -35,7 +35,7 @@ type EjercicioDTO = {
   peso: number
   fecha: string
   tipo: "pecho" | "espalda" | "piernas" | "hombros" | "brazos" | "abdominales" | "cardio"
-  intensidad: "pricipiante" | "intermedio" | "avanzado"
+  intensidad: "principiante" | "intermedio" | "avanzado"
 }
 
 export default function EntrenosPage() {
@@ -47,7 +47,7 @@ export default function EntrenosPage() {
     peso: 0,
     fecha: new Date().toISOString().split("T")[0],
     tipo: "pecho",
-    intensidad: "pricipiante",
+    intensidad: "principiante",
   })
   const [ejercicioEditando, setEjercicioEditando] = useState<Ejercicio | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
@@ -114,7 +114,7 @@ export default function EntrenosPage() {
         peso: 0,
         tipo: "pecho",
         fecha: new Date().toISOString().split("T")[0],
-        intensidad: "pricipiante",
+        intensidad: "principiante",
       })
       setIsDialogOpen(false)
     } catch (err) {
@@ -144,7 +144,7 @@ export default function EntrenosPage() {
         repeticiones: ejercicioEditando.repeticiones,
         peso: ejercicioEditando.peso,
         tipo: ejercicioEditando.tipo || "pecho",
-        intensidad: ejercicioEditando.intensidad || "pricipiante",
+        intensidad: ejercicioEditando.intensidad || "principiante",
         fecha: ejercicioEditando.fecha || new Date().toISOString().split("T")[0],
       }
 
@@ -221,7 +221,7 @@ export default function EntrenosPage() {
   )
 
   const tipos = ["pecho", "espalda", "piernas", "hombros", "brazos", "abdominales", "cardio"]
-  const intensidad = ["pricipiante", "intermedio", "avanzado"]
+  const intensidad = ["principiante", "intermedio", "avanzado"]
 
   return (
     <AuthGuard>

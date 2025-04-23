@@ -15,7 +15,6 @@ import {
   guardarCalculadoraIMC,
   isAuthenticated,
 } from "@/lib/api"
-import { useToast } from "@/hooks/use-toast"
 
 export default function CalculadoraIMCPage() {
   const [peso, setPeso] = useState("")
@@ -27,7 +26,7 @@ export default function CalculadoraIMCPage() {
   const [recomendaciones, setRecomendaciones] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const { toast } = useToast()
+  const [success, setSuccess] = useState<string | null>(null)
   const [isUserLoggedIn, setIsUserLoggedIn] = useState(false)
 
   useEffect(() => {
@@ -58,6 +57,7 @@ export default function CalculadoraIMCPage() {
 
     setIsSaving(true)
     setError(null)
+    setSuccess(null)
 
     try {
       const pesoNum = Number.parseFloat(peso)
@@ -78,10 +78,7 @@ export default function CalculadoraIMCPage() {
         categoria
       })
 
-      toast({
-        title: "Resultado guardado",
-        description: "Tu IMC ha sido guardado correctamente en tu historial.",
-      })
+      setSuccess("Resultado guardado")
     } catch (err) {
       console.error("Error al guardar IMC:", err)
       setError("No se pudo guardar el resultado. Por favor, inténtalo de nuevo.")
@@ -106,6 +103,12 @@ export default function CalculadoraIMCPage() {
       {error && (
         <Alert variant="destructive" className="mb-4">
           <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
+      {success && (
+        <Alert className="mb-4 bg-green-50 text-green-800 border-green-200">
+          <AlertDescription>{success}</AlertDescription>
         </Alert>
       )}
 

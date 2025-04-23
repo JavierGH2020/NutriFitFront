@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import {
   Plus,
@@ -38,20 +38,11 @@ import { Badge } from "@/components/ui/badge"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { useToast } from "@/hooks/use-toast"
-import {
-  getRutinas,
-  createRutina,
-  updateRutina,
-  deleteRutina,
-  getEjercicios,
-  addEjercicioToRutina,
-  removeEjercicioFromRutina,
-  isPremiumUser,
-  type Rutina,
-  type Ejercicio,
-} from "@/lib/api"
 import AuthGuard from "@/components/auth-guard"
 import PremiumGuard from "@/components/premium-guard"
+import { getCurrentUser, fetchAPI, type Ejercicio, type Rutina, deleteRutina } from "@/lib/api"
+import { get } from "http"
+import { de } from "date-fns/locale"
 
 // Mapeo para los días de la semana
 const diasSemanaMap = {
@@ -60,15 +51,92 @@ const diasSemanaMap = {
   tres: "Tres veces por semana",
 }
 
+// Datos de ejemplo para ejercicios
+const ejerciciosEjemplo: Ejercicio[] = [
+  { id: 1, nombre: "Press de banca", series: 4, repeticiones: 10, peso: 60, tipo: "pecho", descanso: 90, fecha: new Date().toISOString(), intensidad: "principiante" },
+  { id: 2, nombre: "Sentadillas", series: 4, repeticiones: 12, peso: 80, tipo: "piernas", descanso: 120, fecha: new Date().toISOString(), intensidad: "intermedio" },
+  { id: 3, nombre: "Dominadas", series: 3, repeticiones: 8, peso: 0, tipo: "espalda", descanso: 60, fecha: new Date().toISOString(), intensidad: "principiante" },
+  { id: 4, nombre: "Press militar", series: 3, repeticiones: 10, peso: 40, tipo: "hombros", descanso: 90, fecha: new Date().toISOString(), intensidad: "avanzado" },
+  { id: 5, nombre: "Curl de bíceps", series: 3, repeticiones: 12, peso: 15, tipo: "brazos", descanso: 60, fecha: new Date().toISOString(), intensidad: "principiante" },
+  { id: 6, nombre: "Extensiones de tríceps", series: 3, repeticiones: 12, peso: 20, tipo: "brazos", descanso: 60, fecha: new Date().toISOString(), intensidad: "intermedio" },
+  { id: 7, nombre: "Abdominales", series: 3, repeticiones: 15, peso: 0, tipo: "abdominales", descanso: 45, fecha: new Date().toISOString(), intensidad: "principiante" },
+  { id: 8, nombre: "Peso muerto", series: 4, repeticiones: 8, peso: 100, tipo: "espalda", descanso: 120, fecha: new Date().toISOString(), intensidad: "avanzado" },
+  { id: 9, nombre: "Zancadas", series: 3, repeticiones: 10, peso: 30, tipo: "piernas", descanso: 90, fecha: new Date().toISOString(), intensidad: "avanzado" },
+  { id: 10, nombre: "Flexiones", series: 3, repeticiones: 15, peso: 0, tipo: "pecho", descanso: 60, fecha: new Date().toISOString(), intensidad: "principiante" },
+];
+
+// Función para obtener ejercicios de la API y formatearlos correctamente
+export const fetchEjercicios = async (): Promise<Ejercicio[]> => {
+  try {
+    const user = await getCurrentUser();
+    if (!user?.id) {
+      throw new Error("Usuario no autenticado");
+    }
+
+    const response = await fetchAPI('/api/ejercicios');
+
+    if (response.data && Array.isArray(response.data)) {
+      // Transformar cada elemento a formato de Ejercicio
+      return response.data.map((item: any): Ejercicio => {
+        const attributes = item.attributes || {};
+
+        return {
+          id: item.id,
+          nombre: item.nombre || "Ejercicio sin nombre",
+          series: item.series || 3,
+          repeticiones: item.repeticiones || 10,
+          peso: item.peso || 0,
+          tipo: item.tipo || "pecho",
+          descanso: item.descanso || 60,
+          fecha: item.fecha || new Date().toISOString(),
+          intensidad: item.intensidad || "principiante"
+        };
+      });
+    }
+
+    return [];
+  } catch (error) {
+    console.error("Error al obtener ejercicios:", error);
+    throw new Error(`Error al obtener ejercicios: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+  }
+};
+
+// Cargar ejercicios y añadirlos al array de ejemplo
+fetchEjercicios()
+  .then((ejerciciosNuevos) => {
+    ejerciciosEjemplo.push(...ejerciciosNuevos);
+    console.log("Total de ejercicios cargados:", ejerciciosEjemplo.length);
+  })
+  .catch((error) => {
+    console.error("Error fetching ejercicios:", error);
+  });
+
+// Datos de ejemplo para rutinas
+const rutinasEjemplo: Rutina[] = [
+  {
+    id: 1,
+    nombre: "Rutina de fuerza",
+    descripcion: "Enfocada en ganar fuerza y masa muscular",
+    diasSemana: "tres",
+    ejercicios: [ejerciciosEjemplo[0], ejerciciosEjemplo[1], ejerciciosEjemplo[7]],
+  },
+  {
+    id: 2,
+    nombre: "Rutina de definición",
+    descripcion: "Para definir y tonificar los músculos",
+    diasSemana: "dos",
+    ejercicios: [ejerciciosEjemplo[2], ejerciciosEjemplo[4], ejerciciosEjemplo[6]],
+  },
+]
+
 export default function RutinasPage() {
-  const router = useRouter()
   const { toast } = useToast()
   const [rutinas, setRutinas] = useState<Rutina[]>([])
   const [ejercicios, setEjercicios] = useState<Ejercicio[]>([])
-  const [nuevaRutina, setNuevaRutina] = useState({
+  const [nuevaRutina, setNuevaRutina] = useState<Partial<Rutina>>({
     nombre: "",
     descripcion: "",
-    diasSemana: undefined as "uno" | "dos" | "tres" | undefined,
+    diasSemana: "uno",
   })
   const [rutinaEditando, setRutinaEditando] = useState<Rutina | null>(null)
   const [rutinaSeleccionada, setRutinaSeleccionada] = useState<Rutina | null>(null)
@@ -79,7 +147,6 @@ export default function RutinasPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [isPremium, setIsPremium] = useState(false)
 
   // Datos para añadir ejercicio a rutina
   const [nuevoEjercicioRutina, setNuevoEjercicioRutina] = useState({
@@ -87,60 +154,29 @@ export default function RutinasPage() {
     series: 3,
     repeticiones: 10,
     peso: 0,
-    descanso: 60, // segundos
+    descanso: 60,
   })
 
-  // Verificar si el usuario es premium
+  // Cargar datos de ejemplo al montar el componente
   useEffect(() => {
-    const checkUserStatus = async () => {
+    // Simulamos una carga de datos
+    const loadData = async () => {
+      setIsLoading(true)
       try {
-        const premium = await isPremiumUser()
-        setIsPremium(premium)
-      } catch (error) {
-        console.error("Error al verificar estado premium:", error)
-        setIsPremium(false)
+        // En una implementación real, aquí cargaríamos los datos de la API
+        await new Promise((resolve) => setTimeout(resolve, 1000)) // Simular carga
+        setRutinas(rutinasEjemplo)
+        setEjercicios(ejerciciosEjemplo)
+      } catch (err) {
+        console.error("Error al cargar datos:", err)
+        setError("Error al cargar los datos. Por favor, inténtalo de nuevo.")
+      } finally {
+        setIsLoading(false)
       }
     }
 
-    checkUserStatus()
+    loadData()
   }, [])
-
-  // Cargar rutinas al montar el componente
-  const fetchRutinas = useCallback(async () => {
-    setIsLoading(true)
-    setError(null)
-    try {
-      const response = await getRutinas()
-      console.log("Rutinas cargadas:", response)
-      setRutinas(response.data || [])
-    } catch (err) {
-      console.error("Error al cargar rutinas:", err)
-      setError("Error al cargar las rutinas. Por favor, inténtalo de nuevo.")
-    } finally {
-      setIsLoading(false)
-    }
-  }, [])
-
-  // Función para obtener ejercicios desde la API
-  const fetchEjercicios = useCallback(async () => {
-    try {
-      const response = await getEjercicios()
-      console.log("Ejercicios cargados:", response)
-      setEjercicios(response.data || [])
-    } catch (err) {
-      console.error("Error al cargar ejercicios:", err)
-      toast({
-        title: "Error",
-        description: "No se pudieron cargar los ejercicios. Por favor, intenta de nuevo.",
-        variant: "destructive",
-      })
-    }
-  }, [toast])
-
-  useEffect(() => {
-    fetchRutinas()
-    fetchEjercicios()
-  }, [fetchRutinas, fetchEjercicios])
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
@@ -157,7 +193,7 @@ export default function RutinasPage() {
     setRutinaEditando({
       ...rutinaEditando,
       [name]: value,
-    } as Rutina)
+    })
   }
 
   const handleDiasSemanaChange = (value: string) => {
@@ -173,7 +209,7 @@ export default function RutinasPage() {
     setRutinaEditando({
       ...rutinaEditando,
       diasSemana: value as "uno" | "dos" | "tres",
-    } as Rutina)
+    })
   }
 
   const handleSubmit = async () => {
@@ -186,55 +222,43 @@ export default function RutinasPage() {
     setError(null)
 
     try {
-      console.log("Preparando datos para crear rutina:", nuevaRutina)
+      // Simular creación de rutina
+      await new Promise((resolve) => setTimeout(resolve, 500))
 
-      // Crear un objeto limpio para enviar
-      const rutinaData = {
+      const newRutina: Rutina = {
+        id: Date.now(), // Generar un ID único
         nombre: nuevaRutina.nombre,
         descripcion: nuevaRutina.descripcion || "",
         diasSemana: nuevaRutina.diasSemana,
         ejercicios: [],
       }
 
-      //console.log("Enviando datos para crear rutina:", rutinaData)
+      setRutinas([...rutinas, newRutina])
 
-      const response = await createRutina(rutinaData)
+      // Limpiar el formulario
+      setNuevaRutina({
+        nombre: "",
+        descripcion: "",
+        diasSemana: "uno",
+      })
 
-      //console.log("Respuesta completa de creación:", response)
+      // Cerrar el diálogo
+      setIsDialogOpen(false)
 
-      if (response && response.data) {
-        // Actualizar el estado con la nueva rutina
-        setRutinas((prevRutinas) => [...prevRutinas, response.data])
-
-        // Limpiar el formulario
-        setNuevaRutina({
-          nombre: "",
-          descripcion: "",
-          diasSemana: undefined,
-        })
-
-        // Cerrar el diálogo
-        setIsDialogOpen(false)
-
-        // Mostrar notificación de éxito
-        toast({
-          title: "Rutina creada",
-          description: "La rutina se ha creado correctamente.",
-        })
-      } else {
-        throw new Error("No se recibió una respuesta válida del servidor")
-      }
+      toast({
+        title: "Rutina creada",
+        description: "La rutina se ha creado correctamente.",
+      })
     } catch (err: any) {
       console.error("Error al crear rutina:", err)
-      // Mostrar un mensaje de error más descriptivo
       setError(`Error al crear la rutina: ${err.message || "Por favor, inténtalo de nuevo."}`)
     } finally {
       setIsSaving(false)
     }
   }
 
-  const handleEdit = (documentId: string) => {
-    const rutinaToEdit = rutinas.find((rutina) => rutina.documentId === documentId)
+  const handleEdit = (id: number) => {
+    const rutinaToEdit = rutinas.find((rutina) => rutina.id === id)
     if (rutinaToEdit) {
       setRutinaEditando(rutinaToEdit)
       setIsEditDialogOpen(true)
@@ -248,17 +272,20 @@ export default function RutinasPage() {
     setError(null)
 
     try {
-      const response = await updateRutina(rutinaEditando.documentId, {
-        nombre: rutinaEditando.nombre,
-        descripcion: rutinaEditando.descripcion,
-        diasSemana: rutinaEditando.diasSemana,
-      })
+      // Simular actualización de rutina
+      await new Promise((resolve) => setTimeout(resolve, 500))
 
-      setRutinas(rutinas.map((rutina) => (rutina.documentId === rutinaEditando.documentId ? response.data : rutina)))
+      const updatedRutinas = rutinas.map((rutina) => (rutina.id === rutinaEditando.id ? rutinaEditando : rutina))
+
+      setRutinas(updatedRutinas)
+
+      // Si la rutina que se está editando es la seleccionada, actualizarla
+      if (rutinaSeleccionada && rutinaSeleccionada.id === rutinaEditando.id) {
+        setRutinaSeleccionada(rutinaEditando)
+      }
+
       setRutinaEditando(null)
       setIsEditDialogOpen(false)
-      setRutinaSeleccionada(response.data)
-      
 
       toast({
         title: "Rutina actualizada",
@@ -272,22 +299,12 @@ export default function RutinasPage() {
     }
   }
 
-  const handleDelete = async (documentId: string) => {
+  const handleDelete = async (documentId: number) => {
     try {
       await deleteRutina(documentId)
-      setRutinas(rutinas.filter((rutina) => rutina.documentId !== documentId))
-
-      // Si la rutina que se está eliminando es la seleccionada, deseleccionarla
-      if (rutinaSeleccionada && rutinaSeleccionada.documentId === documentId) {
-        setRutinaSeleccionada(null)
-      }
-
-      toast({
-        title: "Rutina eliminada",
-        description: "La rutina se ha eliminado correctamente.",
-      })
+      setRutina(rutinas.filter((rutina) => rutina.documentId !== documentId.toString()))
     } catch (err) {
-      setError("Error al eliminar la rutina. Por favor, inténtalo de nuevo.")
+      setError("Error al eliminar el alimento. Por favor, inténtalo de nuevo.")
       console.error(err)
     }
   }
@@ -310,7 +327,6 @@ export default function RutinasPage() {
     setIsAddEjercicioDialogOpen(true)
   }
 
-  // Modificar la función handleSaveEjercicio para usar documentId en lugar de id
   const handleSaveEjercicio = async () => {
     if (!rutinaSeleccionada || nuevoEjercicioRutina.ejercicioId === 0) return
 
@@ -318,23 +334,33 @@ export default function RutinasPage() {
     setError(null)
 
     try {
-      // Usar documentId en lugar de id
-      const response = await addEjercicioToRutina(
-        rutinaSeleccionada.documentId,
-        nuevoEjercicioRutina.ejercicioId.toString(),
-        nuevoEjercicioRutina.series,
-        nuevoEjercicioRutina.repeticiones,
-        nuevoEjercicioRutina.peso,
-        nuevoEjercicioRutina.descanso,
-      )
+      // Simular añadir ejercicio a rutina
+      await new Promise((resolve) => setTimeout(resolve, 500))
 
-      // Actualizar la rutina seleccionada con los nuevos datos
-      setRutinaSeleccionada(response.data)
+      const ejercicioToAdd = ejercicios.find((e) => e.id === nuevoEjercicioRutina.ejercicioId)
 
-      // Actualizar la lista de rutinas usando documentId para la comparación
-      setRutinas(
-        rutinas.map((rutina) => (rutina.documentId === rutinaSeleccionada.documentId ? response.data : rutina)),
-      )
+      if (!ejercicioToAdd) {
+        throw new Error("Ejercicio no encontrado")
+      }
+
+      const ejercicioConDetalles: Ejercicio = {
+        ...ejercicioToAdd,
+        series: nuevoEjercicioRutina.series,
+        repeticiones: nuevoEjercicioRutina.repeticiones,
+        peso: nuevoEjercicioRutina.peso,
+        descanso: nuevoEjercicioRutina.descanso,
+      }
+
+      const updatedRutina = {
+        ...rutinaSeleccionada,
+        ejercicios: [...(rutinaSeleccionada.ejercicios || []), ejercicioConDetalles],
+      }
+
+      // Actualizar la rutina seleccionada
+      setRutinaSeleccionada(updatedRutina)
+
+      // Actualizar la lista de rutinas
+      setRutinas(rutinas.map((r) => (r.id === updatedRutina.id ? updatedRutina : r)))
 
       setIsAddEjercicioDialogOpen(false)
 
@@ -350,25 +376,25 @@ export default function RutinasPage() {
     }
   }
 
-  // Modificar la función handleRemoveEjercicio para usar documentId
   const handleRemoveEjercicio = async (index: number) => {
     if (!rutinaSeleccionada) return
-
-    if (!confirm("¿Estás seguro de que deseas eliminar este ejercicio de la rutina?")) {
-      return
-    }
-
     try {
-      // Usar documentId en lugar de id
-      const response = await removeEjercicioFromRutina(rutinaSeleccionada.documentId, index)
+      // Simular eliminar ejercicio de rutina
+      await new Promise((resolve) => setTimeout(resolve, 500))
 
-      // Actualizar la rutina seleccionada con los nuevos datos
-      setRutinaSeleccionada(response.data)
+      const updatedEjercicios = [...(rutinaSeleccionada.ejercicios || [])]
+      updatedEjercicios.splice(index, 1)
 
-      // Actualizar la lista de rutinas usando documentId para la comparación
-      setRutinas(
-        rutinas.map((rutina) => (rutina.documentId === rutinaSeleccionada.documentId ? response.data : rutina)),
-      )
+      const updatedRutina = {
+        ...rutinaSeleccionada,
+        ejercicios: updatedEjercicios,
+      }
+
+      // Actualizar la rutina seleccionada
+      setRutinaSeleccionada(updatedRutina)
+
+      // Actualizar la lista de rutinas
+      setRutinas(rutinas.map((r) => (r.id === updatedRutina.id ? updatedRutina : r)))
 
       toast({
         title: "Ejercicio eliminado",
@@ -380,7 +406,7 @@ export default function RutinasPage() {
     }
   }
 
-  const handleMoveEjercicio = async (index: number, direction: "up" | "down") => {
+  const handleMoveEjercicio = (index: number, direction: "up" | "down") => {
     if (!rutinaSeleccionada || !rutinaSeleccionada.ejercicios) return
 
     // No se puede mover hacia arriba si es el primer elemento
@@ -389,15 +415,24 @@ export default function RutinasPage() {
     // No se puede mover hacia abajo si es el último elemento
     if (direction === "down" && index === rutinaSeleccionada.ejercicios.length - 1) return
 
-    // Con la nueva estructura de relación, no podemos reordenar directamente
-    // Necesitamos usar el endpoint de Strapi para actualizar el orden
+    const newIndex = direction === "up" ? index - 1 : index + 1
+    const updatedEjercicios = [...rutinaSeleccionada.ejercicios]
 
-    // Por ahora, mostramos un mensaje de que esta funcionalidad no está disponible
-    toast({
-      title: "Funcionalidad no disponible",
-      description: "La funcionalidad de reordenar ejercicios no está disponible con la nueva estructura de datos.",
-      variant: "destructive",
-    })
+    // Intercambiar elementos
+    const temp = updatedEjercicios[index]
+    updatedEjercicios[index] = updatedEjercicios[newIndex]
+    updatedEjercicios[newIndex] = temp
+
+    const updatedRutina = {
+      ...rutinaSeleccionada,
+      ejercicios: updatedEjercicios,
+    }
+
+    // Actualizar la rutina seleccionada
+    setRutinaSeleccionada(updatedRutina)
+
+    // Actualizar la lista de rutinas
+    setRutinas(rutinas.map((r) => (r.id === updatedRutina.id ? updatedRutina : r)))
   }
 
   const filteredRutinas = rutinas.filter((rutina) => rutina.nombre.toLowerCase().includes(searchTerm.toLowerCase()))
@@ -593,7 +628,7 @@ export default function RutinasPage() {
                   <div className="grid gap-2">
                     <Label htmlFor="ejercicio">Ejercicio</Label>
                     <Select
-                      value={nuevoEjercicioRutina.ejercicioId.toString()}
+                      value={nuevoEjercicioRutina.ejercicioId ? nuevoEjercicioRutina.ejercicioId.toString() : ""}
                       onValueChange={(value) =>
                         setNuevoEjercicioRutina({
                           ...nuevoEjercicioRutina,
@@ -606,7 +641,7 @@ export default function RutinasPage() {
                       </SelectTrigger>
                       <SelectContent>
                         {ejercicios.map((ejercicio) => (
-                          <SelectItem key={ejercicio.documentId || ejercicio.id} value={ejercicio.id.toString()}>
+                          <SelectItem key={ejercicio.id} value={ejercicio.id.toString()}>
                             {ejercicio.nombre}
                           </SelectItem>
                         ))}
@@ -720,14 +755,12 @@ export default function RutinasPage() {
                         </Button>
                       </div>
                     ) : (
-                      // Modificar el mapeo de rutinas para usar documentId como key y en la comparación
                       <div className="divide-y">
                         {filteredRutinas.map((rutina) => (
                           <div
-                            key={rutina.documentId || `rutina-${rutina.id}`}
-                            className={`p-4 cursor-pointer hover:bg-muted transition-colors ${
-                              rutinaSeleccionada?.documentId === rutina.documentId ? "bg-muted" : ""
-                            }`}
+                            key={rutina.id}
+                            className={`p-4 cursor-pointer hover:bg-muted transition-colors ${rutinaSeleccionada?.id === rutina.id ? "bg-muted" : ""
+                              }`}
                             onClick={() => handleSelectRutina(rutina)}
                           >
                             <div className="flex justify-between items-start">
@@ -748,7 +781,7 @@ export default function RutinasPage() {
                                   size="icon"
                                   onClick={(e) => {
                                     e.stopPropagation()
-                                    handleEdit(rutina.documentId)
+                                    handleEdit(rutina.id)
                                   }}
                                 >
                                   <Edit className="h-4 w-4" />
@@ -758,7 +791,7 @@ export default function RutinasPage() {
                                   size="icon"
                                   onClick={(e) => {
                                     e.stopPropagation()
-                                    handleDelete(rutina.documentId)
+                                    handleDelete(rutina.id)
                                   }}
                                 >
                                   <Trash className="h-4 w-4" />
@@ -817,60 +850,57 @@ export default function RutinasPage() {
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {rutinaSeleccionada.ejercicios &&
-                              rutinaSeleccionada.ejercicios.map((ejercicio, index) => {
-                                return (
-                                  <TableRow key={ejercicio.documentId || `ejercicio-${index}`}>
-                                    <TableCell className="font-medium">
-                                      <div className="flex flex-col items-center">
-                                        <span>{index + 1}</span>
-                                        <div className="flex flex-col mt-1">
-                                          <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            className="h-5 w-5"
-                                            onClick={() => handleMoveEjercicio(index, "up")}
-                                            disabled={index === 0}
-                                          >
-                                            <ArrowUp className="h-3 w-3" />
-                                          </Button>
-                                          <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            className="h-5 w-5"
-                                            onClick={() => handleMoveEjercicio(index, "down")}
-                                            disabled={index === rutinaSeleccionada.ejercicios.length - 1}
-                                          >
-                                            <ArrowDown className="h-3 w-3" />
-                                          </Button>
-                                        </div>
-                                      </div>
-                                    </TableCell>
-                                    <TableCell>
-                                      <div>
-                                        <span className="font-medium">{ejercicio.nombre || "Ejercicio"}</span>
-                                        <p className="text-xs text-muted-foreground capitalize">
-                                          {ejercicio.tipo || "Sin categoría"}
-                                        </p>
-                                      </div>
-                                    </TableCell>
-                                    <TableCell className="text-center">{ejercicio.series || 3}</TableCell>
-                                    <TableCell className="text-center">{ejercicio.repeticiones || 10}</TableCell>
-                                    <TableCell className="text-center">{ejercicio.peso || 0} kg</TableCell>
-                                    <TableCell className="text-center">
-                                      <div className="flex items-center justify-center gap-1">
-                                        <Clock className="h-3 w-3 text-muted-foreground" />
-                                        <span>{ejercicio.descanso || 60}s</span>
-                                      </div>
-                                    </TableCell>
-                                    <TableCell className="text-right">
-                                      <Button variant="ghost" size="icon" onClick={() => handleRemoveEjercicio(index)}>
-                                        <Trash className="h-4 w-4" />
+                            {rutinaSeleccionada.ejercicios.map((ejercicio, index) => (
+                              <TableRow key={`${ejercicio.id}-${index}`}>
+                                <TableCell className="font-medium">
+                                  <div className="flex flex-col items-center">
+                                    <span>{index + 1}</span>
+                                    <div className="flex flex-col mt-1">
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-5 w-5"
+                                        onClick={() => handleMoveEjercicio(index, "up")}
+                                        disabled={index === 0}
+                                      >
+                                        <ArrowUp className="h-3 w-3" />
                                       </Button>
-                                    </TableCell>
-                                  </TableRow>
-                                )
-                              })}
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-5 w-5"
+                                        onClick={() => handleMoveEjercicio(index, "down")}
+                                        disabled={index === rutinaSeleccionada.ejercicios.length - 1}
+                                      >
+                                        <ArrowDown className="h-3 w-3" />
+                                      </Button>
+                                    </div>
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  <div>
+                                    <span className="font-medium">{ejercicio.nombre}</span>
+                                    <p className="text-xs text-muted-foreground capitalize">
+                                      {ejercicio.tipo || "Sin categoría"}
+                                    </p>
+                                  </div>
+                                </TableCell>
+                                <TableCell className="text-center">{ejercicio.series || 3}</TableCell>
+                                <TableCell className="text-center">{ejercicio.repeticiones || 10}</TableCell>
+                                <TableCell className="text-center">{ejercicio.peso || 0} kg</TableCell>
+                                <TableCell className="text-center">
+                                  <div className="flex items-center justify-center gap-1">
+                                    <Clock className="h-3 w-3 text-muted-foreground" />
+                                    <span>{ejercicio.descanso || 60}s</span>
+                                  </div>
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <Button variant="ghost" size="icon" onClick={() => handleRemoveEjercicio(index)}>
+                                    <Trash className="h-4 w-4" />
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+                            ))}
                           </TableBody>
                         </Table>
                       )}

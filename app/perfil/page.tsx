@@ -202,12 +202,6 @@ export default function PerfilPage() {
                             {userData.datos.altura ? `${userData.datos.altura} cm` : "No especificada"}
                           </span>
                         </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Nivel de actividad:</span>
-                          <span className="font-medium capitalize">
-                            {userData.datos.nivelActividad || "No especificado"}
-                          </span>
-                        </div>
                       </>
                     )}
 
@@ -381,7 +375,7 @@ export default function PerfilPage() {
                           <Utensils className="mr-2 h-4 w-4" />
                           Ver alimentos
                         </Button>
-                        <Button variant="outline" className="w-full" onClick={() => router.push("/entrenos")}>
+                        <Button variant="outline" className="w-full" onClick={() => router.push("/ejercicios")}>
                           <Dumbbell className="mr-2 h-4 w-4" />
                           Ver ejercicios
                         </Button>

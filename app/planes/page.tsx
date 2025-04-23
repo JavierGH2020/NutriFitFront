@@ -6,9 +6,11 @@ import { Check, Sparkles, Loader2, AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { getCurrentUser, isPremiumUser, fetchAPI, updateUserRole } from "@/lib/api"
 import AuthGuard from "@/components/auth-guard"
 import { useToast } from "@/hooks/use-toast"
+
+// Añadir la importación de la nueva función
+import { isPremiumUser, upgradeUserToPremium } from "@/lib/api"
 
 export default function PlanesPage() {
   const router = useRouter()
@@ -37,7 +39,7 @@ export default function PlanesPage() {
     checkUserPlan()
   }, [])
 
-  // Buscar la función handleUpgrade y reemplazarla con esta versión mejorada
+  // Reemplazar la función handleUpgrade con esta nueva versión
   const handleUpgrade = async (plan: string) => {
     if (plan === "basico" || currentPlan === plan) return
 
@@ -46,23 +48,10 @@ export default function PlanesPage() {
     setSuccess(null)
 
     try {
-      // Obtener el usuario actual
-      const user = await getCurrentUser()
-      if (!user) {
-        throw new Error("No se pudo obtener la información del usuario")
-      }
+      // Usar la nueva función que llama al endpoint personalizado
+      const response = await upgradeUserToPremium()
 
-      console.log("Usuario actual:", user)
-      console.log("ID del usuario:", user.id)
-
-      // Determinar el ID del rol correcto para el plan premium
-      // Normalmente, el rol "authenticated" tiene un ID específico en Strapi
-      // Vamos a usar 3 como ejemplo, pero debes verificar el ID correcto en tu base de datos
-      const premiumRoleId = "x9aawizeevtjasviv5bk4s5z" // Ajusta este valor según tu configuración de Strapi
-
-      console.log("Actualizando usuario a rol premium con ID:", premiumRoleId)
-
-      await updateUserRole(user.id, premiumRoleId)
+      console.log("Respuesta de actualización:", response)
 
       setSuccess(
         `¡Felicidades! Tu cuenta ha sido actualizada al plan ${plan === "premium" ? "Premium" : "Premium Anual"}.`,
@@ -81,7 +70,7 @@ export default function PlanesPage() {
       }, 2000)
     } catch (err) {
       console.error("Error detallado al actualizar plan:", err)
-      setError("No se pudo procesar la actualización. Por favor, inténtalo de nuevo.")
+      setError(err.message || "No se pudo procesar la actualización. Por favor, inténtalo de nuevo.")
     } finally {
       setIsLoading(false)
     }

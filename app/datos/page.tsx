@@ -17,8 +17,7 @@ import AuthGuard from "@/components/auth-guard"
 import { useToast } from "@/hooks/use-toast"
 
 export default function DatosPage() {
-  const router = useRouter()
-  const { toast } = useToast()
+
   const [datos, setDatos] = useState<DatoUsuario | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
@@ -101,11 +100,6 @@ export default function DatosPage() {
       } as DatoUsuario)
 
       setSuccess("Datos guardados correctamente")
-
-      toast({
-        title: "Datos guardados",
-        description: "Tus datos personales se han guardado correctamente.",
-      })
     } catch (err: any) {
       console.error("Error al guardar datos:", err)
       setError(err.message || "No se pudieron guardar tus datos. Por favor, inténtalo de nuevo.")
