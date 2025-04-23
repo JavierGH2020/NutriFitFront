@@ -1,7 +1,7 @@
 import { document } from "postcss"
 
 // Importa la variable de entorno API_URL desde el archivo .env
-export const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:1337"
+export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:1337"
 
 // Tipos para los datos de la API
 export type User = {
@@ -27,7 +27,7 @@ export type DatoUsuario = {
   categoria: string
   imc: number
   nivelActividad?: string; // Add this property
-  user?: User
+  user?: User | number // Relación con el usuario
   createdAt: string
   updatedAt: string
   publishedAt?: string
@@ -40,8 +40,7 @@ export type Calculadora = {
   genero: "hombre" | "mujer"
   peso: number
   altura: number
-  nivelActividad: "bajo" | "medio" | "alto"
-  user?: User
+  user?: User | number // Relación con el usuario
   createdAt: string
   updatedAt: string
   publishedAt?: string
@@ -55,7 +54,7 @@ export type Objetivo = {
   pesoDeseado: number
   fechaLimite: string
   plan: string
-  user?: User
+  user?: User | number // Relación con el usuario
   createdAt: string
   updatedAt: string
   publishedAt?: string
@@ -86,9 +85,9 @@ export type Ejercicio = {
   peso: number
   fecha: string
   tipo: "pecho" | "espalda" | "piernas" | "hombros" | "brazos" | "abdominales" | "cardio"
-  intensidad: "principiante" | "medio" | "avanzado"
-  createdAt: string
-  updatedAt: string
+  intensidad: "principiante" | "intermedio" | "avanzado"
+  createdAt?: string
+  updatedAt?: string
   publishedAt?: string
   documentId?: string
   user?: User | number // Relación con el usuario
@@ -102,8 +101,8 @@ export type Rutina = {
   diasSemana?: "uno" | "dos" | "tres"
   ejercicios?: Ejercicio[]
   user?: User | number // Relación con el usuario
-  createdAt: string
-  updatedAt: string
+  createdAt?: string
+  updatedAt?: string
   publishedAt?: string
   documentId?: string
 }
@@ -166,7 +165,7 @@ export const getCurrentUser = async (): Promise<any> => {
     const response = await fetchAPI("/api/users/me?populate=role");
 
     // Verificamos si la respuesta contiene el rol
-    if (response && response.role) {
+    if (response.role) {
       //console.log("Usuario con rol encontrado:", response.role.type);  // Inspecciona el rol
       //("Usuario y rol:", response);  // Inspecciona la respuesta
       return response;  // Retornamos la respuesta que incluye el rol
@@ -185,7 +184,7 @@ export const isPremiumUser = async (): Promise<boolean> => {
     const user = await getCurrentUser();
     //console.log("Usuario actual:", user.role.type);  // Inspecciona el usuario
     // Verificamos si el rol existe y si el tipo de rol es "premium"
-    if (user && user.role && user.role.type === "authenticated") {
+    if (user.role.type === "authenticated") {
       //alert("El rol del usuario es autenticated")
       // Si el rol tiene el tipo "premium", devolver true
       return true;
@@ -229,20 +228,20 @@ export const getDatosUsuario = async (): Promise<DatoUsuario | null> => {
     const id = user?.id;
 
     if (!id) {
-      console.error("No se encontró la ID del usuario");
+      //console.error("No se encontró la ID del usuario");
       return null;
     }
 
-    // Petición que trae los datos del usuario junto con la relación 'dato_usuarios'
-    const response = await fetchAPI(`/api/users/me?populate=dato_usuarios`);
+    // Petición que trae los datos del usuario junto con la relación 'usuarios'
+    const response = await fetchAPI(`/api/users/me?populate=usuarios`);
 
-    const datos = response;
+    const datos = response?.usuarios;
 
     if (datos && datos.length > 0) {
       //console.log("Datos del usuario:", datos[0]);
       return datos[0]; // o datos[0].attributes si necesitas solo los atributos
     } else {
-      console.error("No se encontraron datos en la relación dato_usuarios");
+      console.error("No se encontraron datos en la relación usuarios");
       return null;
     }
 
@@ -289,56 +288,67 @@ export const getObjetivosUsuario = async (): Promise<Objetivo | null> => {
 // Función para guardar datos del usuario
 export const saveDatosUsuario = async (data: Partial<DatoUsuario>): Promise<any> => {
   try {
-    // Verificar si el usuario ya tiene datos
     const currentData = await getDatosUsuario()
 
-    if (currentData && currentData.documentId) {
+    if (currentData?.documentId) {
       // Actualizar datos existentes
+      console.log("Actualizando datos del usuario con ID:", currentData.documentId); // Log para verificar el ID
       const response = await fetchAPI(`/api/usuarios/${currentData.documentId}`, {
         method: "PUT",
-        body: JSON.stringify({ data }),
-      })
-      return response
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ data })
+      });
+      console.log("Respuesta del PUT:", response); // Log para verificar la respuesta
+      return response;
     } else {
       // Crear nuevos datos
+      console.log("Creando nuevos datos para el usuario");
       const response = await fetchAPI("/api/usuarios", {
         method: "POST",
-        body: JSON.stringify({ data }),
-      })
-      return response
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ data })
+      });
+      console.log("Respuesta del POST:", response); // Log para verificar la respuesta
+      return response;
     }
   } catch (error) {
-    console.error("Error al guardar datos del usuario:", error)
-    throw error
+    console.error("Error al guardar datos del usuario:", error);
+    throw error;
   }
 }
 
 // Función para guardar objetivos del usuario
 export const saveObjetivosUsuario = async (data: Partial<Objetivo>): Promise<any> => {
   try {
-    // Verificar si el usuario ya tiene objetivos
     const currentData = await getObjetivosUsuario()
 
-    if (currentData && currentData.documentId) {
+    if (currentData?.documentId) {
       // Actualizar objetivos existentes
+      console.log("Actualizando objetivos con ID:", currentData.documentId); // Log para verificar el ID
       const response = await fetchAPI(`/api/objetivos/${currentData.documentId}`, {
         method: "PUT",
-        body: JSON.stringify({ data }),
-      })
-      return response
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ data })
+      });
+      console.log("Respuesta del PUT:", response); // Log para verificar la respuesta
+      return response;
     } else {
       // Crear nuevos objetivos
+      console.log("Creando nuevos objetivos");
       const response = await fetchAPI("/api/objetivos", {
         method: "POST",
-        body: JSON.stringify({ data }),
-      })
-      return response
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ data })
+      });
+      console.log("Respuesta del POST:", response); // Log para verificar la respuesta
+      return response;
     }
   } catch (error) {
-    console.error("Error al guardar objetivos del usuario:", error)
-    throw error
+    console.error("Error al guardar objetivos del usuario:", error);
+    throw error;
   }
 }
+
 
 
 // Función para realizar peticiones a la API
@@ -371,9 +381,9 @@ export const fetchAPI = async (endpoint: string, options: RequestInit = {}): Pro
 
       try {
         const errorData = await response.json()
-        errorMessage = errorData.error?.message || errorData.message || errorMessage
+        errorMessage = (errorData.error?.message ?? errorData.message) ?? errorMessage
       } catch (e) {
-        // Si no podemos parsear la respuesta como JSON, usamos el mensaje por defecto
+        console.error("Error al parsear la respuesta como JSON:", e);
       }
 
       throw new Error(errorMessage)
@@ -387,9 +397,10 @@ export const fetchAPI = async (endpoint: string, options: RequestInit = {}): Pro
     }
 
     // Si la respuesta incluye un token JWT, lo guardamos
-    if (data && data.jwt) {
+    if (data?.jwt) {
       setAuthToken(data.jwt)
     }
+
 
     return data
   } catch (error) {
@@ -531,19 +542,13 @@ export const logout = (): void => {
   }
 }
 
-// Función para obtener alimentos
+// Función para obtener alimentos de un usuario específico
 export const getAlimentos = async (params: Record<string, any> = {}): Promise<any> => {
-  const queryParams = new URLSearchParams()
-
-  // Añadir parámetros a la URL
-  Object.entries(params).forEach(([key, value]) => {
-    queryParams.append(key, String(value))
-  })
-
-  const queryString = queryParams.toString() ? `?${queryParams.toString()}` : ""
-
-  return fetchAPI(`/api/alimentos${queryString}`)
+  const user = await getCurrentUser()
+  //alert("ID de usuario: " + user?.id)
+  return fetchAPI(`/api/alimentos?filters[user][id][$eq]=${user.id}&populate=user`)
 }
+
 
 // Función para obtener un alimento por ID
 export const getAlimento = async (id: number): Promise<any> => {
@@ -580,7 +585,7 @@ export const updateAlimento = async (id: number, data: any): Promise<any> => {
     })
 
     // Verificar que la actualización fue exitosa
-    if (!response || !response.data) {
+    if (!response?.data) {
       throw new Error("No se pudo actualizar el alimento")
     }
 
@@ -609,16 +614,9 @@ export const deleteAlimento = async (id: number): Promise<any> => {
 
 // Función para obtener ejercicios
 export const getEjercicios = async (params: Record<string, any> = {}): Promise<any> => {
-  const queryParams = new URLSearchParams()
-
-  // Añadir parámetros a la URL
-  Object.entries(params).forEach(([key, value]) => {
-    queryParams.append(key, String(value))
-  })
-
-  const queryString = queryParams.toString() ? `?${queryParams.toString()}` : ""
-
-  return fetchAPI(`/api/ejercicios${queryString}`)
+  const user = await getCurrentUser()
+  //alert("ID de usuario: " + user?.id)
+  return fetchAPI(`/api/ejercicios?filters[user][id][$eq]=${user.id}&populate=user`)
 }
 
 // Función para obtener un ejercicio por ID
@@ -656,7 +654,7 @@ export const updateEjercicio = async (id: number, data: any): Promise<any> => {
     })
 
     // Verificar que la actualización fue exitosa
-    if (!response || !response.data) {
+    if (!response.data) {
       throw new Error("No se pudo actualizar el ejercicio")
     }
 
@@ -814,63 +812,50 @@ export const getHistorialIMC = async (params: Record<string, any> = {}): Promise
 }
 
 // Función mejorada para obtener rutinas (solo del usuario actual)
-export const getRutinas = async (params: Record<string, any> = {}): Promise<any> => {
+export const getRutinas = async (params: Record<string, any> = {}): Promise<{ data: Rutina[] }> => {
   try {
-    const user = await getCurrentUser()
+    const user = await getCurrentUser();
     if (!user?.id) {
-      throw new Error("Usuario no autenticado")
+      throw new Error("Usuario no autenticado");
     }
 
-    const queryParams = new URLSearchParams()
-
-    // Añadir filtro por usuario usando el nuevo campo users_permissions_user
-    queryParams.append("filters[users_permissions_user][id][$eq]", user.id.toString())
-
-    // Añadir parámetros adicionales a la URL
-    Object.entries(params).forEach(([key, value]) => {
-      queryParams.append(key, String(value))
-    })
-
-    // Añadir populate para obtener datos relacionados
-    queryParams.append("populate[0]", "ejercicios")
-    queryParams.append("populate[1]", "users_permissions_user")
-
-    const queryString = queryParams.toString() ? `?${queryParams.toString()}` : ""
-
-    const response = await fetchAPI(`/api/rutinas${queryString}`)
+    // Opcionalmente filtrar por usuario actual
+    const queryParams = new URLSearchParams({
+      ...params,
+      'filters[user][id][$eq]': user.id.toString()
+    });
+    
+    const response = await fetchAPI(`/api/rutinas?${queryParams}`);
 
     // Transformar la respuesta para que sea más fácil de usar
-    if (response && response.data) {
+    if (response.data && Array.isArray(response.data)) {
       return {
-        data: response.data.map((item: any) => {
-          const attributes = item.attributes || {}
+        data: response.data.map((item: any): Rutina => {
 
           // Extraer ejercicios si existen
-          let ejercicios = []
-          if (attributes.ejercicios && attributes.ejercicios.data) {
-            ejercicios = attributes.ejercicios.data.map((ej: any) => ({
-              id: ej.id,
-              ...ej.attributes,
-            }))
-          }
+          const ejercicios: Ejercicio[] = item.ejercicios?.data
+            ? item.ejercicios.data.map((ej: any): Ejercicio => ({
+                id: ej.id,
+                ...ej.item,
+              }))
+            : [];
 
           return {
             id: item.id,
-            nombre: item.nombre || "",
-            descripcion: item.descripcion || "",
-            diasSemana: item.diasSemana || null,
-            //ejercicios: item.ejercicios,
-            ejercicios: ejercicios,
-            users_permissions_user: attributes.users_permissions_user?.data?.id || null,
-          }
+            nombre: item.nombre ?? "",
+            descripcion: item.descripcion ?? "",
+            diasSemana: item.diaSemana ?? null,
+            ejercicios,
+            user: item.user?.data?.id ?? null,
+          };
         }),
-      }
+      };
     }
 
-    return { data: [] }
+    return { data: [] };
   } catch (error) {
-    console.error("Error al obtener rutinas:", error)
-    throw error
+    console.error("Error al obtener rutinas:", error);
+    throw new Error(`Error al obtener rutinas: ${error instanceof Error ? error.message : 'Error desconocido'}`);
   }
 }
 
@@ -885,12 +870,12 @@ export const getRutina = async (documentId: string): Promise<any> => {
 
     const response = await fetchAPI(`/api/rutinas/${documentId}`)
     console.log("Respuesta de la rutina:", response)
-    if (response && response.data) {
+    if (response.data) {
       const attributes = response.data.attributes || {}
 
       // Extraer ejercicios si existen
       let ejercicios = []
-      if (attributes.ejercicios && attributes.ejercicios.data) {
+      if (attributes.ejercicios.data) {
         ejercicios = attributes.ejercicios.data.map((ej: any) => ({
           id: ej.id,
           ...ej.attributes,
@@ -933,7 +918,7 @@ export const createRutina = async (data: any): Promise<any> => {
       nombre: data.nombre,
       descripcion: data.descripcion || "",
       diasSemana: data.diasSemana || null,
-      users_permissions_user: user.id,
+      user: user.id,
     }
 
     const response = await fetchAPI("/api/rutinas", {
@@ -975,7 +960,7 @@ export const updateRutina = async (documentId: string, data: any): Promise<any> 
 
     // Verificar que la rutina pertenece al usuario
     const rutina = await getRutina(documentId)
-    if (!rutina || !rutina.data || rutina.data.users_permissions_user !== user.id) {
+    if (rutina?.data?.user !== user.id) {
       throw new Error("No tienes permiso para actualizar esta rutina")
     }
 
@@ -1014,7 +999,7 @@ export const deleteRutina = async (documentId: number): Promise<any> => {
 
     // Verificar que la rutina pertenece al usuario
     const rutina = await getRutina(documentId)
-    if (!rutina || !rutina.data || rutina.data.users_permissions_user !== user.id) {
+    if (!rutina.data || rutina.data.user !== user.id) {
       throw new Error("No tienes permiso para eliminar esta rutina")
     }
 
@@ -1049,13 +1034,13 @@ export const addEjercicioToRutina = async (
 
     // Verificar que la rutina existe y pertenece al usuario
     const rutinaResponse = await getRutina(rutinaId)
-    if (!rutinaResponse || !rutinaResponse.data) {
+    if (!rutinaResponse.data) {
       throw new Error("La rutina no existe o no tienes permiso para modificarla")
     }
 
     // Verificar que el ejercicio existe
     const ejercicioResponse = await getEjercicio(ejercicioId)
-    if (!ejercicioResponse || !ejercicioResponse.data) {
+    if (!ejercicioResponse.data) {
       throw new Error("El ejercicio no existe")
     }
 
@@ -1071,7 +1056,7 @@ export const addEjercicioToRutina = async (
     console.log("Respuesta de añadir ejercicio:", response)
 
     // Después de añadir la relación, obtenemos la rutina actualizada
-    return getRutina(rutinaId)
+    return getRutina(rutinaId.toString())
   } catch (error) {
     console.error("Error al añadir ejercicio a la rutina:", error)
     throw error
@@ -1093,7 +1078,7 @@ export const removeEjercicioFromRutina = async (rutinaId: number, ejercicioIndex
     }
 
     // Verificar que el ejercicio existe en la rutina
-    if (!rutina.data.ejercicios || !rutina.data.ejercicios[ejercicioIndex]) {
+    if (!rutina.data.ejercicios?.[ejercicioIndex]) {
       throw new Error("El ejercicio no existe en la rutina")
     }
 
@@ -1112,24 +1097,37 @@ export const removeEjercicioFromRutina = async (rutinaId: number, ejercicioIndex
   }
 }
 
-export const updateUserRole = async (userId: number, roleId: string): Promise<any> => {
+export const upgradeUserToPremium = async (): Promise<any> => {
   try {
-    console.log(`Actualizando rol del usuario ${userId} a ${roleId}`)
-
-    // Llamada directa a la API de Strapi para actualizar el rol
-    const response = await fetchAPI(`/api/users/${userId}`, {
-      method: "PUT",
-      body: JSON.stringify({
-        role: {
-          documentId: roleId,
-        }
-      }),
-    })
-
-    console.log("Respuesta de actualización de rol:", response)
-    return response
-  } catch (error) {
-    console.error("Error al actualizar rol de usuario:", error)
-    throw error
+    // Verificar que el usuario esté autenticado
+    const token = getAuthToken();
+    if (!token) {
+      throw new Error("Usuario no autenticado");
+    }
+    
+    // Esta es la ruta que debería coincidir con tu backend
+    const url = `${API_URL}/api/premium`;
+    console.log("Intentando conectar a:", url);
+    
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.text();
+      console.error("Respuesta de error del servidor:", response.status, errorData);
+      throw new Error(`Error del servidor: ${response.status} ${errorData}`);
+    }
+    
+    const responseData = await response.json();
+    console.log("Respuesta exitosa:", responseData);
+    return responseData;
+  } catch (error: any) {
+    console.error("Error detallado al actualizar a premium:", error);
+    throw new Error("No se pudo actualizar el rol: " + (error.message || "Error desconocido"));
   }
 }

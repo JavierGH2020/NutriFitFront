@@ -77,7 +77,7 @@ export default function AlimentosPage() {
       }
 
       const response = await getAlimentos(params)
-      setAlimentos(response.data || [])
+      setAlimentos(response.data ?? [])
     } catch (err) {
       setError("Error al cargar los alimentos. Por favor, inténtalo de nuevo.")
       console.error(err)
@@ -202,7 +202,7 @@ export default function AlimentosPage() {
       setIsLoading(true)
       try {
         const response = await getAlimentos({})
-        setAlimentos(response.data || [])
+        setAlimentos(response.data ?? [])
       } catch (err) {
         setError("Error al cargar los alimentos. Por favor, inténtalo de nuevo.")
         console.error(err)
@@ -215,7 +215,7 @@ export default function AlimentosPage() {
   }
 
   const filteredAlimentos = alimentos.filter((alimento) =>
-    alimento && alimento.nombre ? alimento.nombre.toLowerCase().includes(searchTerm.toLowerCase()) : false,
+    alimento.nombre ? alimento.nombre.toLowerCase().includes(searchTerm.toLowerCase()) : false,
   )
   console.log(filteredAlimentos)
 
@@ -376,7 +376,6 @@ export default function AlimentosPage() {
                             onSelect={handleDateSelect}
                             locale={es}
                             className="p-0"
-                            initialFocus
                             fixedWeeks
                             ISOWeek
                           />
@@ -434,7 +433,7 @@ export default function AlimentosPage() {
                         id="edit-calorias"
                         name="calorias"
                         type="number"
-                        value={alimentoEditando.calorias || 0}
+                        value={alimentoEditando.calorias ?? 0}
                         onChange={handleEditInputChange}
                       />
                     </div>
@@ -444,7 +443,7 @@ export default function AlimentosPage() {
                         id="edit-proteinas"
                         name="proteinas"
                         type="number"
-                        value={alimentoEditando.proteinas || 0}
+                        value={alimentoEditando.proteinas ?? 0}
                         onChange={handleEditInputChange}
                       />
                     </div>
@@ -456,7 +455,7 @@ export default function AlimentosPage() {
                         id="edit-carbohidratos"
                         name="carbohidratos"
                         type="number"
-                        value={alimentoEditando.carbohidratos || 0}
+                        value={alimentoEditando.carbohidratos ?? 0}
                         onChange={handleEditInputChange}
                       />
                     </div>
@@ -466,7 +465,7 @@ export default function AlimentosPage() {
                         id="edit-grasas"
                         name="grasas"
                         type="number"
-                        value={alimentoEditando.grasas || 0}
+                        value={alimentoEditando.grasas ?? 0}
                         onChange={handleEditInputChange}
                       />
                     </div>
@@ -492,7 +491,6 @@ export default function AlimentosPage() {
                               onSelect={handleEditDateSelect}
                               locale={es}
                               className="p-0"
-                              initialFocus
                               fixedWeeks
                               ISOWeek
                             />
@@ -503,7 +501,7 @@ export default function AlimentosPage() {
                     <div className="grid gap-2">
                       <Label htmlFor="edit-tipo">Tipo</Label>
                       <Select
-                        value={alimentoEditando.tipo || "desayuno"}
+                        value={alimentoEditando.tipo ?? "desayuno"}
                         onValueChange={(value) =>
                           setAlimentoEditando({
                             ...alimentoEditando,
@@ -627,7 +625,7 @@ export default function AlimentosPage() {
                                 {alimento.grasas !== null ? `${alimento.grasas}g` : "N/A"}
                               </TableCell>
                               <TableCell className="capitalize">
-                                {alimento.tipo ? alimento.tipo : "Sin especificar"}
+                                {alimento.tipo ?? "Sin especificar"}
                               </TableCell>
                               <TableCell>
                                 {alimento.fecha ? new Date(alimento.fecha).toLocaleDateString() : "N/A"}
