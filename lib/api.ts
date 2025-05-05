@@ -1,7 +1,7 @@
 import { document } from "postcss"
 
 // Importa la variable de entorno API_URL desde el archivo .env
-export const API_URL = process.env.NEXT_API_URL ?? "https://nutrifit-p0z5.onrender.com"
+export const API_URL = process.env.NEXT_API_URL ?? "http://localhost:1337"
 
 // Tipos para los datos de la API
 export type User = {
