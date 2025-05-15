@@ -9,12 +9,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { format, subDays, startOfMonth, endOfMonth, subMonths, subYears } from "date-fns"
-import { isValid } from 'date-fns'
+import { format, subDays, startOfMonth, endOfMonth, subMonths, subYears, isValid } from 'date-fns'
 import { es } from 'date-fns/locale'
 import {
-  getHistorialAlimentos,
-  getHistorialEjercicios,
+  getAlimentos,
+  getEjercicios,
   getHistorialIMC,
   type Alimento,
   type Ejercicio,
@@ -110,55 +109,21 @@ export default function HistorialPage() {
     setIsLoadingIMC(true)
     setError(null)
 
-    // Calcular fechas para filtrar según el periodo seleccionado
-    const fechaFin = format(endOfMonth(new Date(añoActual, mesActual, 1)), "yyyy-MM-dd")
-    let fechaInicio
-
-    switch (periodo) {
-      case "semana":
-        fechaInicio = format(subDays(new Date(), 7), "yyyy-MM-dd")
-        break
-      case "mes":
-        fechaInicio = format(startOfMonth(new Date(añoActual, mesActual, 1)), "yyyy-MM-dd")
-        break
-      case "trimestre":
-        fechaInicio = format(subMonths(new Date(añoActual, mesActual, 1), 3), "yyyy-MM-dd")
-        break
-      case "año":
-        fechaInicio = format(subYears(new Date(añoActual, mesActual, 1), 1), "yyyy-MM-dd")
-        break
-      default:
-        fechaInicio = format(startOfMonth(new Date(añoActual, mesActual, 1)), "yyyy-MM-dd")
-    }
 
     try {
-      // Obtener historial de alimentos
-      const alimentosParams = {
-        "filters[fecha][$gte]": fechaInicio,
-        "filters[fecha][$lte]": fechaFin,
-        sort: "fecha:desc",
-      }
-
-      const alimentosResponse = await getHistorialAlimentos(alimentosParams)
-      const alimentosAgrupados = agruparAlimentosPorFecha(alimentosResponse.data || [])
+      const alimentosResponse = await getAlimentos()
+      const alimentosAgrupados = agruparAlimentosPorFecha(alimentosResponse.data ?? [])
       setAlimentosHistorial(alimentosAgrupados)
       setIsLoadingAlimentos(false)
 
-      // Obtener historial de ejercicios
-      const ejerciciosParams = {
-        "filters[fecha][$gte]": fechaInicio,
-        "filters[fecha][$lte]": fechaFin,
-        sort: "fecha:desc",
-      }
-
-      const ejerciciosResponse = await getHistorialEjercicios(ejerciciosParams)
-      const ejerciciosAgrupados = agruparEjerciciosPorFecha(ejerciciosResponse.data || [])
+      const ejerciciosResponse = await getEjercicios()
+      const ejerciciosAgrupados = agruparEjerciciosPorFecha(ejerciciosResponse.data ?? [])
       setEjerciciosHistorial(ejerciciosAgrupados)
       setIsLoadingEjercicios(false)
 
 
       const imcResponse = await getHistorialIMC()
-      setImcHistorial(imcResponse.data || [])
+      setImcHistorial(imcResponse.data ?? [])
       setIsLoadingIMC(false)
     } catch (err) {
       setError("Error al cargar el historial. Por favor, inténtalo de nuevo.")
@@ -184,10 +149,10 @@ export default function HistorialPage() {
     return alimentos.reduce(
       (acc, alimento) => {
         // Convertir explícitamente a números para evitar concatenación de strings
-        const calorias = Number(alimento.calorias || 0)
-        const proteinas = Number(alimento.proteinas || 0)
-        const carbohidratos = Number(alimento.carbohidratos || 0)
-        const grasas = Number(alimento.grasas || 0)
+        const calorias = Number(alimento.calorias ?? 0)
+        const proteinas = Number(alimento.proteinas ?? 0)
+        const carbohidratos = Number(alimento.carbohidratos ?? 0)
+        const grasas = Number(alimento.grasas ?? 0)
 
         return {
           calorias: acc.calorias + calorias,
@@ -225,7 +190,7 @@ export default function HistorialPage() {
       <div className="container py-8">
         <h1 className="mb-3 text-3xl font-bold">Historial</h1>
         <CardDescription className="mb-6 text-muted-foreground">
-          El filtro del historial mostrará todos los elementos registrados dentro del periodo o rango de fechas seleccionado
+          El filtro del historial mostrará todos los elementos registrados 
         </CardDescription>
 
         {error && (
@@ -238,32 +203,6 @@ export default function HistorialPage() {
           <div className="flex items-center gap-2">
             <Calendar className="h-5 w-5 text-muted-foreground" />
             <h2 className="text-xl font-semibold">Tu progreso</h2>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-4">
-            <Select value={periodo} onValueChange={setPeriodo}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Seleccionar periodo" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="semana">Última semana</SelectItem>
-                <SelectItem value="mes">Último mes</SelectItem>
-                <SelectItem value="trimestre">Último trimestre</SelectItem>
-                <SelectItem value="año">Último año</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="icon" onClick={() => cambiarMes(-1)}>
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <span className="text-sm font-medium capitalize">
-                {nombreMes} {añoActual}
-              </span>
-              <Button variant="outline" size="icon" onClick={() => cambiarMes(1)}>
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
           </div>
         </div>
 

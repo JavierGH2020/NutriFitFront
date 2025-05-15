@@ -44,11 +44,11 @@ export default function LoginPage() {
             cleanAuthParams()
             router.push("/")
           } else {
-            setError(result.message || "Error al iniciar sesión con Google")
+            setError(result.message ?? "Error al iniciar sesión con Google")
           }
         })
         .catch((err) => {
-          setError(err.message || "Error al procesar la autenticación con Google")
+          setError(err.message ?? "Error al procesar la autenticación con Google")
         })
         .finally(() => {
           setIsGoogleLoading(false)
@@ -69,7 +69,7 @@ export default function LoginPage() {
       console.error("Error de inicio de sesión:", err)
 
       if (err && typeof err === "object") {
-        if (err.error && err.error.message) {
+        if (err.error.message) {
           setError(err.error.message)
         } else if (err.message) {
           setError(err.message)

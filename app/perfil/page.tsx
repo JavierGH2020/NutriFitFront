@@ -2,11 +2,9 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { User, Save, Loader2, LineChart, Target, Calculator, Dumbbell, Utensils, AlertCircle } from "lucide-react"
+import { Loader2, LineChart, Target, Calculator, Dumbbell, Utensils, AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Separator } from "@/components/ui/separator"
@@ -17,21 +15,17 @@ import {
   getDatosUsuario,
   getObjetivosUsuario,
   getHistorialIMC,
-  getHistorialAlimentos,
-  getHistorialEjercicios,
-  updateUserProfile,
+  getAlimentos,
+  getEjercicios,
   isPremiumUser,
 } from "@/lib/api"
 import AuthGuard from "@/components/auth-guard"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
-import { useToast } from "@/hooks/use-toast"
 
 export default function PerfilPage() {
   const router = useRouter()
-  const { toast } = useToast()
   const [isLoading, setIsLoading] = useState(true)
-  const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
 
@@ -69,8 +63,8 @@ export default function PerfilPage() {
           getDatosUsuario(),
           getObjetivosUsuario(),
           getHistorialIMC(),
-          getHistorialAlimentos({ sort: "fecha:desc", "pagination[limit]": 5 }),
-          getHistorialEjercicios({ sort: "fecha:desc", "pagination[limit]": 5 }),
+          getAlimentos(),
+          getEjercicios(),
         ],
       )
 
@@ -79,9 +73,9 @@ export default function PerfilPage() {
         user,
         datos,
         objetivos,
-        imcHistorial: imcResponse.data || [],
-        alimentosRecientes: alimentosResponse.data || [],
-        ejerciciosRecientes: ejerciciosResponse.data || [],
+        imcHistorial: imcResponse.data ?? [],
+        alimentosRecientes: alimentosResponse.data ?? [],
+        ejerciciosRecientes: ejerciciosResponse.data ?? [],
         isPremium,
       })
 
@@ -89,8 +83,8 @@ export default function PerfilPage() {
       if (user) {
         setFormData({
           ...formData,
-          username: user.username || "",
-          email: user.email || "",
+          username: user.username ?? "",
+          email: user.email ?? "",
         })
       }
     } catch (err) {
@@ -106,20 +100,12 @@ export default function PerfilPage() {
     loadUserData()
   }, [])
 
-  // Manejar cambios en el formulario
-  const handleInputChange = (e) => {
-    const { name, value } = e.target
-    setFormData({
-      ...formData,
-      [name]: value,
-    })
-  }
 
   // Obtener las iniciales del usuario para el avatar
   const getUserInitials = () => {
     const { user } = userData
-    if (!user || !user.username) {
-      return user?.email?.charAt(0).toUpperCase() || "U"
+    if (!user.username) {
+      return user?.email?.charAt(0).toUpperCase() ?? "U"
     }
     return user.username.charAt(0).toUpperCase()
   }

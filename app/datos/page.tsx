@@ -3,7 +3,6 @@
 import type React from "react"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
 import { Database, Save, Loader2, AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -14,7 +13,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { getDatosUsuario, saveDatosUsuario, type DatoUsuario } from "@/lib/api"
 import AuthGuard from "@/components/auth-guard"
-import { useToast } from "@/hooks/use-toast"
 
 export default function DatosPage() {
 
@@ -102,7 +100,7 @@ export default function DatosPage() {
       setSuccess("Datos guardados correctamente")
     } catch (err: any) {
       console.error("Error al guardar datos:", err)
-      setError(err.message || "No se pudieron guardar tus datos. Por favor, inténtalo de nuevo.")
+      setError(err.message ?? "No se pudieron guardar tus datos. Por favor, inténtalo de nuevo.")
     } finally {
       setIsSaving(false)
     }

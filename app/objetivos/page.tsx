@@ -3,7 +3,6 @@
 import type React from "react"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
 import { Target, Save, Loader2, Calendar, AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -20,7 +19,6 @@ import AuthGuard from "@/components/auth-guard"
 import { useToast } from "@/hooks/use-toast"
 
 export default function ObjetivosPage() {
-  const router = useRouter()
   const { toast } = useToast()
   const [objetivos, setObjetivos] = useState<Objetivo | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -119,7 +117,7 @@ export default function ObjetivosPage() {
       setObjetivos({
         ...objetivos,
         ...formData,
-        id: objetivos?.id || response.data.id,
+        id: objetivos?.id ?? response.data.id,
       } as Objetivo)
 
       setSuccess("Objetivos guardados correctamente")
@@ -130,7 +128,7 @@ export default function ObjetivosPage() {
       })
     } catch (err: any) {
       console.error("Error al guardar objetivos:", err)
-      setError(err.message || "No se pudieron guardar tus objetivos. Por favor, inténtalo de nuevo.")
+      setError(err.message ?? "No se pudieron guardar tus objetivos. Por favor, inténtalo de nuevo.")
     } finally {
       setIsSaving(false)
     }
@@ -231,7 +229,6 @@ export default function ObjetivosPage() {
                           selected={date}
                           onSelect={handleDateSelect}
                           locale={es}
-                          initialFocus
                           disabled={(date) => date < new Date()} // No permitir fechas pasadas
                         />
                       </PopoverContent>

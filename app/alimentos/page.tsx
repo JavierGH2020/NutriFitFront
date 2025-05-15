@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useState, useEffect } from "react"
-import { Plus, Search, Edit, Trash, Save, Loader2, Filter } from "lucide-react"
+import { Plus, Search, Edit, Trash, Save, Loader2} from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -56,8 +56,6 @@ export default function AlimentosPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [date, setDate] = useState<Date | undefined>(new Date())
-  const [isFilterOpen, setIsFilterOpen] = useState(false)
-  const [filterTipo, setFilterTipo] = useState<string | null>(null)
 
   // Cargar alimentos al montar el componente
   useEffect(() => {
@@ -69,14 +67,7 @@ export default function AlimentosPage() {
     setIsLoading(true)
     setError(null)
     try {
-      const params: Record<string, any> = {}
-
-      // Aplicar filtros SOLO si existen valores seleccionados
-      if (filterTipo && filterTipo !== "todos") {
-        params["filters[tipo][$eq]"] = filterTipo
-      }
-
-      const response = await getAlimentos(params)
+      const response = await getAlimentos()
       setAlimentos(response.data ?? [])
     } catch (err) {
       setError("Error al cargar los alimentos. Por favor, inténtalo de nuevo.")
@@ -188,32 +179,6 @@ export default function AlimentosPage() {
     }
   }
 
-  const handleFilterApply = () => {
-    fetchAlimentos()
-    setIsFilterOpen(false)
-  }
-
-  const handleFilterClear = () => {
-    setFilterTipo(null)
-    setIsFilterOpen(false)
-
-    // Llamar a fetchAlimentos sin filtros para cargar todos los alimentos
-    const fetchAllAlimentos = async () => {
-      setIsLoading(true)
-      try {
-        const response = await getAlimentos({})
-        setAlimentos(response.data ?? [])
-      } catch (err) {
-        setError("Error al cargar los alimentos. Por favor, inténtalo de nuevo.")
-        console.error(err)
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    fetchAllAlimentos()
-  }
-
   const filteredAlimentos = alimentos.filter((alimento) =>
     alimento.nombre ? alimento.nombre.toLowerCase().includes(searchTerm.toLowerCase()) : false,
   )
@@ -261,41 +226,6 @@ export default function AlimentosPage() {
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-
-            <Popover open={isFilterOpen} onOpenChange={setIsFilterOpen}>
-              <PopoverTrigger asChild>
-                <Button variant="outline" className="w-full sm:w-auto">
-                  <Filter className="mr-2 h-4 w-4" />
-                  Filtros
-                  {filterTipo && <span className="ml-1 rounded-full bg-primary w-2 h-2"></span>}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-80">
-                <div className="grid gap-4">
-                  <div className="space-y-2">
-                    <h4 className="font-medium">Filtrar por tipo</h4>
-                    <Select value={filterTipo || "todos"} onValueChange={setFilterTipo}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccionar tipo" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="todos">Todas</SelectItem>
-                        <SelectItem value="desayuno">Desayuno</SelectItem>
-                        <SelectItem value="almuerzo">Almuerzo</SelectItem>
-                        <SelectItem value="cena">Cena</SelectItem>
-                        <SelectItem value="snack">Snack</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="flex justify-between">
-                    <Button variant="outline" onClick={handleFilterClear}>
-                      Limpiar
-                    </Button>
-                    <Button onClick={handleFilterApply}>Aplicar filtros</Button>
-                  </div>
-                </div>
-              </PopoverContent>
-            </Popover>
           </div>
 
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>

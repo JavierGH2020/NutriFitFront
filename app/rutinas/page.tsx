@@ -3,7 +3,6 @@
 import type React from "react"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
 import {
   Plus,
   Search,
@@ -40,9 +39,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { useToast } from "@/hooks/use-toast"
 import AuthGuard from "@/components/auth-guard"
 import PremiumGuard from "@/components/premium-guard"
-import { getCurrentUser, fetchAPI, type Ejercicio, type Rutina, deleteRutina } from "@/lib/api"
-import { get } from "http"
-import { de } from "date-fns/locale"
+import { getCurrentUser, fetchAPI, type Ejercicio, type Rutina, deleteRutina, createRutina, addEjercicioToRutina, updateRutina } from "@/lib/api"
 
 // Mapeo para los días de la semana
 const diasSemanaMap = {
@@ -50,20 +47,6 @@ const diasSemanaMap = {
   dos: "Dos veces por semana",
   tres: "Tres veces por semana",
 }
-
-// Datos de ejemplo para ejercicios
-const ejerciciosEjemplo: Ejercicio[] = [
-  { id: 1, nombre: "Press de banca", series: 4, repeticiones: 10, peso: 60, tipo: "pecho", descanso: 90, fecha: new Date().toISOString(), intensidad: "principiante" },
-  { id: 2, nombre: "Sentadillas", series: 4, repeticiones: 12, peso: 80, tipo: "piernas", descanso: 120, fecha: new Date().toISOString(), intensidad: "intermedio" },
-  { id: 3, nombre: "Dominadas", series: 3, repeticiones: 8, peso: 0, tipo: "espalda", descanso: 60, fecha: new Date().toISOString(), intensidad: "principiante" },
-  { id: 4, nombre: "Press militar", series: 3, repeticiones: 10, peso: 40, tipo: "hombros", descanso: 90, fecha: new Date().toISOString(), intensidad: "avanzado" },
-  { id: 5, nombre: "Curl de bíceps", series: 3, repeticiones: 12, peso: 15, tipo: "brazos", descanso: 60, fecha: new Date().toISOString(), intensidad: "principiante" },
-  { id: 6, nombre: "Extensiones de tríceps", series: 3, repeticiones: 12, peso: 20, tipo: "brazos", descanso: 60, fecha: new Date().toISOString(), intensidad: "intermedio" },
-  { id: 7, nombre: "Abdominales", series: 3, repeticiones: 15, peso: 0, tipo: "abdominales", descanso: 45, fecha: new Date().toISOString(), intensidad: "principiante" },
-  { id: 8, nombre: "Peso muerto", series: 4, repeticiones: 8, peso: 100, tipo: "espalda", descanso: 120, fecha: new Date().toISOString(), intensidad: "avanzado" },
-  { id: 9, nombre: "Zancadas", series: 3, repeticiones: 10, peso: 30, tipo: "piernas", descanso: 90, fecha: new Date().toISOString(), intensidad: "avanzado" },
-  { id: 10, nombre: "Flexiones", series: 3, repeticiones: 15, peso: 0, tipo: "pecho", descanso: 60, fecha: new Date().toISOString(), intensidad: "principiante" },
-];
 
 // Función para obtener ejercicios de la API y formatearlos correctamente
 export const fetchEjercicios = async (): Promise<Ejercicio[]> => {
@@ -78,10 +61,10 @@ export const fetchEjercicios = async (): Promise<Ejercicio[]> => {
     if (response.data && Array.isArray(response.data)) {
       // Transformar cada elemento a formato de Ejercicio
       return response.data.map((item: any): Ejercicio => {
-        const attributes = item.attributes || {};
 
         return {
           id: item.id,
+          documentId: item.documentId,
           nombre: item.nombre || "Ejercicio sin nombre",
           series: item.series || 3,
           repeticiones: item.repeticiones || 10,
@@ -101,33 +84,36 @@ export const fetchEjercicios = async (): Promise<Ejercicio[]> => {
   }
 };
 
-// Cargar ejercicios y añadirlos al array de ejemplo
-fetchEjercicios()
-  .then((ejerciciosNuevos) => {
-    ejerciciosEjemplo.push(...ejerciciosNuevos);
-    console.log("Total de ejercicios cargados:", ejerciciosEjemplo.length);
-  })
-  .catch((error) => {
-    console.error("Error fetching ejercicios:", error);
-  });
 
 // Datos de ejemplo para rutinas
-const rutinasEjemplo: Rutina[] = [
-  {
-    id: 1,
-    nombre: "Rutina de fuerza",
-    descripcion: "Enfocada en ganar fuerza y masa muscular",
-    diasSemana: "tres",
-    ejercicios: [ejerciciosEjemplo[0], ejerciciosEjemplo[1], ejerciciosEjemplo[7]],
-  },
-  {
-    id: 2,
-    nombre: "Rutina de definición",
-    descripcion: "Para definir y tonificar los músculos",
-    diasSemana: "dos",
-    ejercicios: [ejerciciosEjemplo[2], ejerciciosEjemplo[4], ejerciciosEjemplo[6]],
-  },
-]
+const fetchRutinas = async (): Promise<Rutina[]> => {
+  try {
+    const user = await getCurrentUser();
+    if (!user?.id) {
+      throw new Error("Usuario no autenticado");
+    }
+
+    const response = await fetchAPI('/api/rutinas');
+
+    if (response.data && Array.isArray(response.data)) {
+      return response.data.map((item: any): Rutina => {
+        //alert(item.documentId)
+        return {
+          id: item.documentId,
+          nombre: item.nombre || "Rutina sin nombre",
+          descripcion: item.descripcion || "",
+          diasSemana: item.diasSemana || "uno",
+          ejercicios: item.ejercicios || [],
+        };
+      });
+    }
+
+    return [];
+  } catch (error) {
+    console.error("Error al obtener rutinas:", error);
+    throw new Error(`Error al obtener rutinas: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+  }
+};
 
 export default function RutinasPage() {
   const { toast } = useToast()
@@ -163,10 +149,8 @@ export default function RutinasPage() {
     const loadData = async () => {
       setIsLoading(true)
       try {
-        // En una implementación real, aquí cargaríamos los datos de la API
-        await new Promise((resolve) => setTimeout(resolve, 1000)) // Simular carga
-        setRutinas(rutinasEjemplo)
-        setEjercicios(ejerciciosEjemplo)
+        fetchEjercicios().then((data) => setEjercicios(data)) // Cargar ejercicios
+        fetchRutinas().then((data) => setRutinas(data)) // Cargar rutinas
       } catch (err) {
         console.error("Error al cargar datos:", err)
         setError("Error al cargar los datos. Por favor, inténtalo de nuevo.")
@@ -223,7 +207,7 @@ export default function RutinasPage() {
 
     try {
       // Simular creación de rutina
-      await new Promise((resolve) => setTimeout(resolve, 500))
+      await createRutina(nuevaRutina)
 
       const newRutina: Rutina = {
         id: Date.now(), // Generar un ID único
@@ -244,11 +228,6 @@ export default function RutinasPage() {
 
       // Cerrar el diálogo
       setIsDialogOpen(false)
-
-      toast({
-        title: "Rutina creada",
-        description: "La rutina se ha creado correctamente.",
-      })
     } catch (err: any) {
       console.error("Error al crear rutina:", err)
       setError(`Error al crear la rutina: ${err.message || "Por favor, inténtalo de nuevo."}`)
@@ -257,54 +236,45 @@ export default function RutinasPage() {
     }
   }
 
-  const handleEdit = (id: number) => {
-    const rutinaToEdit = rutinas.find((rutina) => rutina.id === id)
+  const handleEdit = (documentId: number) => {
+    const rutinaToEdit = rutinas.find((rutina) => rutina.id === documentId)
+
     if (rutinaToEdit) {
       setRutinaEditando(rutinaToEdit)
       setIsEditDialogOpen(true)
+    } else {
+      console.warn(`No se encontró la rutina con ID: ${documentId}`)
     }
   }
+
 
   const handleSaveEdit = async () => {
     if (!rutinaEditando) return
 
-    setIsSaving(true)
-    setError(null)
-
     try {
-      // Simular actualización de rutina
-      await new Promise((resolve) => setTimeout(resolve, 500))
-
-      const updatedRutinas = rutinas.map((rutina) => (rutina.id === rutinaEditando.id ? rutinaEditando : rutina))
-
-      setRutinas(updatedRutinas)
-
-      // Si la rutina que se está editando es la seleccionada, actualizarla
-      if (rutinaSeleccionada && rutinaSeleccionada.id === rutinaEditando.id) {
-        setRutinaSeleccionada(rutinaEditando)
+      // Extraer solo los campos necesarios para la actualización
+      const dataToUpdate = {
+        nombre: rutinaEditando.nombre || "",
+        descripcion: rutinaEditando.descripcion,
+        diasSemana: rutinaEditando.diasSemana,
       }
 
+      const response = await updateRutina(rutinaEditando.id, dataToUpdate)
+      setRutinas(rutinas.map((rutina) => (rutina.documentId === rutinaEditando.documentId ? response.data : rutina)))
       setRutinaEditando(null)
       setIsEditDialogOpen(false)
-
-      toast({
-        title: "Rutina actualizada",
-        description: "La rutina se ha actualizado correctamente.",
-      })
     } catch (err) {
-      setError("Error al actualizar la rutina. Por favor, inténtalo de nuevo.")
+      setError("Error al actualizar el rutina. Por favor, inténtalo de nuevo.")
       console.error(err)
-    } finally {
-      setIsSaving(false)
     }
   }
 
   const handleDelete = async (documentId: number) => {
     try {
       await deleteRutina(documentId)
-      setRutina(rutinas.filter((rutina) => rutina.documentId !== documentId.toString()))
+      setRutinas(rutinas.filter((rutina) => rutina.documentId !== documentId.toString()))
     } catch (err) {
-      setError("Error al eliminar el alimento. Por favor, inténtalo de nuevo.")
+      setError("Error al eliminar el rutina. Por favor, inténtalo de nuevo.")
       console.error(err)
     }
   }
@@ -334,10 +304,12 @@ export default function RutinasPage() {
     setError(null)
 
     try {
-      // Simular añadir ejercicio a rutina
-      await new Promise((resolve) => setTimeout(resolve, 500))
 
       const ejercicioToAdd = ejercicios.find((e) => e.id === nuevoEjercicioRutina.ejercicioId)
+      await addEjercicioToRutina(
+        rutinaSeleccionada.id,
+        nuevoEjercicioRutina.ejercicioId,
+      )
 
       if (!ejercicioToAdd) {
         throw new Error("Ejercicio no encontrado")
@@ -379,8 +351,7 @@ export default function RutinasPage() {
   const handleRemoveEjercicio = async (index: number) => {
     if (!rutinaSeleccionada) return
     try {
-      // Simular eliminar ejercicio de rutina
-      await new Promise((resolve) => setTimeout(resolve, 500))
+
 
       const updatedEjercicios = [...(rutinaSeleccionada.ejercicios || [])]
       updatedEjercicios.splice(index, 1)
@@ -628,11 +599,11 @@ export default function RutinasPage() {
                   <div className="grid gap-2">
                     <Label htmlFor="ejercicio">Ejercicio</Label>
                     <Select
-                      value={nuevoEjercicioRutina.ejercicioId ? nuevoEjercicioRutina.ejercicioId.toString() : ""}
+                      value={nuevoEjercicioRutina.ejercicioId ? nuevoEjercicioRutina.ejercicioId : ""}
                       onValueChange={(value) =>
                         setNuevoEjercicioRutina({
                           ...nuevoEjercicioRutina,
-                          ejercicioId: Number.parseInt(value),
+                          ejercicioId: value
                         })
                       }
                     >
@@ -641,7 +612,7 @@ export default function RutinasPage() {
                       </SelectTrigger>
                       <SelectContent>
                         {ejercicios.map((ejercicio) => (
-                          <SelectItem key={ejercicio.id} value={ejercicio.id.toString()}>
+                          <SelectItem key={ejercicio.id} value={ejercicio.documentId}>
                             {ejercicio.nombre}
                           </SelectItem>
                         ))}
@@ -658,7 +629,7 @@ export default function RutinasPage() {
                         onChange={(e) =>
                           setNuevoEjercicioRutina({
                             ...nuevoEjercicioRutina,
-                            series: Number.parseInt(e.target.value),
+                            series: e.target.value,
                           })
                         }
                         min={1}
@@ -673,7 +644,7 @@ export default function RutinasPage() {
                         onChange={(e) =>
                           setNuevoEjercicioRutina({
                             ...nuevoEjercicioRutina,
-                            repeticiones: Number.parseInt(e.target.value),
+                            repeticiones: e.target.value,
                           })
                         }
                         min={1}
@@ -706,7 +677,7 @@ export default function RutinasPage() {
                         onChange={(e) =>
                           setNuevoEjercicioRutina({
                             ...nuevoEjercicioRutina,
-                            descanso: Number.parseInt(e.target.value),
+                            descanso: e.target.value,
                           })
                         }
                         min={0}
@@ -756,9 +727,9 @@ export default function RutinasPage() {
                       </div>
                     ) : (
                       <div className="divide-y">
-                        {filteredRutinas.map((rutina) => (
+                        {filteredRutinas.map((rutina, index) => (
                           <div
-                            key={rutina.id}
+                            key={index}
                             className={`p-4 cursor-pointer hover:bg-muted transition-colors ${rutinaSeleccionada?.id === rutina.id ? "bg-muted" : ""
                               }`}
                             onClick={() => handleSelectRutina(rutina)}
@@ -779,8 +750,7 @@ export default function RutinasPage() {
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  onClick={(e) => {
-                                    e.stopPropagation()
+                                  onClick={() => {
                                     handleEdit(rutina.id)
                                   }}
                                 >
@@ -789,8 +759,7 @@ export default function RutinasPage() {
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  onClick={(e) => {
-                                    e.stopPropagation()
+                                  onClick={() => {
                                     handleDelete(rutina.id)
                                   }}
                                 >

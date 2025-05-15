@@ -14,7 +14,6 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { forgotPassword } from "@/lib/api"
 
 export default function ForgotPasswordPage() {
-  const router = useRouter()
   const [email, setEmail] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -49,7 +48,7 @@ export default function ForgotPasswordPage() {
         setServerError(true)
         setError("Error en el servidor: No se pudo enviar el correo electrónico. Por favor, contacta al administrador.")
       } else if (err && typeof err === "object") {
-        if (err.error && err.error.message) {
+        if (err.error.message) {
           setError(err.error.message)
         } else if (err.message) {
           setError(err.message)

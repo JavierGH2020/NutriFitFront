@@ -69,14 +69,8 @@ export default function EntrenosPage() {
     setIsLoading(true)
     setError(null)
     try {
-      const params: Record<string, any> = {}
-
-      if (filterTipo) {
-        params["filters[tipo][$eq]"] = filterTipo
-      }
-
-      const response = await getEjercicios(params)
-      setEjercicios(response.data || [])
+      const response = await getEjercicios()
+      setEjercicios(response.data ?? [])
     } catch (err) {
       setError("Error al cargar los ejercicios. Por favor, inténtalo de nuevo.")
       console.error(err)
@@ -191,33 +185,9 @@ export default function EntrenosPage() {
     }
   }
 
-  const handleFilterApply = () => {
-    fetchEjercicios()
-    setIsFilterOpen(false)
-  }
-
-  const handleFilterClear = () => {
-    setFilterTipo(null)
-    setIsFilterOpen(false)
-    // Llamar a fetchEjercicios sin filtros para cargar todos los ejercicios
-    const fetchAllEjericicos = async () => {
-      setIsLoading(true)
-      try {
-        const response = await getEjercicios({})
-        setEjercicios(response.data || [])
-      } catch (err) {
-        setError("Error al cargar los ejericios. Por favor, inténtalo de nuevo.")
-        console.error(err)
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    fetchAllEjericicos()
-  }
 
   const filteredEjercicios = ejercicios.filter((ejercicio) =>
-    ejercicio && ejercicio.nombre ? ejercicio.nombre.toLowerCase().includes(searchTerm.toLowerCase()) : false,
+    ejercicio.nombre ? ejercicio.nombre.toLowerCase().includes(searchTerm.toLowerCase()) : false,
   )
 
   const tipos = ["pecho", "espalda", "piernas", "hombros", "brazos", "abdominales", "cardio"]
@@ -246,45 +216,6 @@ export default function EntrenosPage() {
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-
-            <Popover open={isFilterOpen} onOpenChange={setIsFilterOpen}>
-              <PopoverTrigger asChild>
-                <Button variant="outline" className="w-full sm:w-auto">
-                  <Filter className="mr-2 h-4 w-4" />
-                  Filtros
-                  {filterTipo && <span className="ml-1 rounded-full bg-primary w-2 h-2"></span>}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-80">
-                <div className="grid gap-4">
-                  <div className="space-y-2">
-                    <h4 className="font-medium">Filtrar por tipo</h4>
-                    <Select value={filterTipo || "todos"} onValueChange={setFilterTipo}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccionar tipo" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="todos">Todas</SelectItem>
-                        <SelectItem value="pecho">Pecho</SelectItem>
-                        <SelectItem value="espalda">Espalda</SelectItem>
-                        <SelectItem value="piernas">Piernas</SelectItem>
-                        <SelectItem value="hombros">Hombros</SelectItem>
-                        <SelectItem value="brazos">Brazos</SelectItem>
-                        <SelectItem value="abdominales">Abdominales</SelectItem>
-                        <SelectItem value="cardio">Cardio</SelectItem>
-                      </SelectContent>
-
-                    </Select>
-                  </div>
-                  <div className="flex justify-between">
-                    <Button variant="outline" onClick={handleFilterClear}>
-                      Limpiar
-                    </Button>
-                    <Button onClick={handleFilterApply}>Aplicar filtros</Button>
-                  </div>
-                </div>
-              </PopoverContent>
-            </Popover>
           </div>
 
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -387,7 +318,6 @@ export default function EntrenosPage() {
                             onSelect={handleDateSelect}
                             locale={es}
                             className="p-0"
-                            initialFocus
                             fixedWeeks
                             ISOWeek
                           />
