@@ -1,4 +1,3 @@
-import { id } from "date-fns/locale"
 import { document } from "postcss"
 
 // Importa la variable de entorno API_URL desde el archivo .env
@@ -926,7 +925,7 @@ export const addEjercicioToRutina = async (rutinaDocumentId: number, ejercicioDo
     const requestData = {
       data: {
         ejercicios: {
-          connect: [{ id: ejercicioId }],
+        id: ejercicioId ,
         },
       },
     }
@@ -942,7 +941,7 @@ export const addEjercicioToRutina = async (rutinaDocumentId: number, ejercicioDo
     console.log("Respuesta de la API:", response)
 
     // Obtener la rutina actualizada
-    return getRutina(rutinaDocumentId)
+    return response
   } catch (error) {
     console.error("Error detallado al añadir ejercicio a la rutina:", error)
 
