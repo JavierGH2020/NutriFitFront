@@ -345,49 +345,63 @@ export const saveObjetivosUsuario = async (data: Partial<Objetivo>): Promise<any
 
 
 
+// Función para realizar peticiones a la API
 export const fetchAPI = async (endpoint: string, options: RequestInit = {}): Promise<any> => {
-  const token = localStorage.getItem('auth_token');
+  const token = getAuthToken()
 
-  const defaultHeaders: HeadersInit = {
-    'Content-Type': 'application/json',
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    ...options.headers,
-  };
+  const defaultOptions: RequestInit = {
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...options.headers,
+    },
+  }
 
-  const mergedOptions: RequestInit = {
+  const mergedOptions = {
+    ...defaultOptions,
     ...options,
-    headers: defaultHeaders,
-  };
+  }
 
   try {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}${endpoint}`, mergedOptions);
+    const response = await fetch(`${API_URL}${endpoint}`, mergedOptions)
 
     if (!response.ok) {
+      // Si la respuesta es 401 (No autorizado), eliminamos el token
       if (response.status === 401) {
-        localStorage.removeItem('auth_token');
+        removeAuthToken()
       }
 
-      let errorMessage = `Error HTTP: ${response.status} ${response.statusText}`;
+      let errorMessage = `Error HTTP: ${response.status} ${response.statusText}`
 
       try {
-        const errorData = await response.json();
-        errorMessage = errorData?.error?.message || errorData?.message || errorMessage;
-      } catch {}
+        const errorData = await response.json()
+        errorMessage = (errorData.error?.message ?? errorData.message) ?? errorMessage
+      } catch (e) {
+        console.error("Error al parsear la respuesta como JSON:", e);
+      }
 
-      throw new Error(errorMessage);
+      throw new Error(errorMessage)
     }
 
-    if (response.status === 204) {
-      return {};
+    // Si la respuesta tiene un cuerpo, parsear como JSON
+    let data = {}
+    if (response.status !== 204) {
+      // Código HTTP 204 significa sin contenido
+      data = await response.json()
     }
 
-    const data = await response.json();
-    return data;
+    // Si la respuesta incluye un token JWT, lo guardamos
+    if (data?.jwt) {
+      setAuthToken(data.jwt)
+    }
+
+
+    return data
   } catch (error) {
-    console.error("Error en fetchAPI:", error);
-    throw error;
+    console.error("Error al realizar la petición:", error)
+    throw error
   }
-};
+}
 
 // Función para iniciar sesión
 export const login = async (identifier: string, password: string): Promise<any> => {
