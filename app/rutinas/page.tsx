@@ -64,7 +64,7 @@ export const fetchEjercicios = async (): Promise<Ejercicio[]> => {
 
         return {
           id: item.id,
-          documentId: item.documentId,
+          //documentId: item.documentId,
           nombre: item.nombre || "Ejercicio sin nombre",
           series: item.series || 3,
           repeticiones: item.repeticiones || 10,
@@ -612,7 +612,7 @@ export default function RutinasPage() {
                       </SelectTrigger>
                       <SelectContent>
                         {ejercicios.map((ejercicio) => (
-                          <SelectItem key={ejercicio.id} value={ejercicio.documentId}>
+                          <SelectItem key={ejercicio.id} value={ejercicio.id}>
                             {ejercicio.nombre}
                           </SelectItem>
                         ))}

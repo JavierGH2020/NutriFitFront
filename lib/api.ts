@@ -1,7 +1,7 @@
 import { document } from "postcss"
 
 // Importa la variable de entorno API_URL desde el archivo .env
-export const API_URL = "https://nutrifit-p0z5.onrender.com"
+export const API_URL = "http://localhost:1337"
 
 // Tipos para los datos de la API
 export type User = {
@@ -817,12 +817,12 @@ export const getRutina = async (id: string): Promise<any> => {
     if (!user?.id) {
       throw new Error("Usuario no autenticado")
     }
-    console.log("ID de la rutina a obtener: " + id)
+    //alert("ID de la rutina a obtener: " + id)
     const response = await fetchAPI(`/api/rutinas/${id}`)
-    console.log("Respuesta de la rutina:", response)
+    console.log("Respuesta de la rutina:", response.data.ejercicios)
     if (response.data) {
       const attributes = response.data.attributes || {}
-      alert("ejrcicio" + attributes.ejercicios)
+      alert("ejrcicio" + JSON.stringify(response.data.ejercicios))  
 
       // Extraer ejercicios si existen
       let ejercicios = []
@@ -904,48 +904,47 @@ export const deleteRutina = async (id: number): Promise<any> => {
   }
 }
 
-// Modificar la función addEjercicioToRutina para usar documentId en lugar de id
 export const addEjercicioToRutina = async (rutinaDocumentId: number, ejercicioDocumentId: number): Promise<any> => {
   try {
     console.log("Añadiendo ejercicio a rutina con los siguientes datos:")
     console.log("DocumentID de la rutina:", rutinaDocumentId)
     console.log("DocumentID del ejercicio:", ejercicioDocumentId)
 
-    // Verificar que los IDs son válidos
     if (!rutinaDocumentId || !ejercicioDocumentId) {
       throw new Error(`IDs inválidos: rutinaDocumentId=${rutinaDocumentId}, ejercicioDocumentId=${ejercicioDocumentId}`)
     }
 
-    // Convertir documentId a id numérico para Strapi
-    // En Strapi, las relaciones se manejan con el id numérico, no con documentId
-    const rutinaId = rutinaDocumentId
-    const ejercicioId = ejercicioDocumentId
+    // Obtener rutina actual con ejercicios relacionados
+    const rutinaResponse = await fetchAPI(`/api/rutinas/${rutinaDocumentId}?populate=ejercicios`, {
+      method: "GET",
+    })
 
-    // Formato correcto para Strapi v4
+    const rutinaActual = rutinaResponse.data
+    const ejerciciosActuales = rutinaActual.ejercicios.map((ej: any) => ej.id)
+
+    // Añadir el nuevo ejercicio al array actual (evitando duplicados)
+    const nuevosEjercicios = [...new Set([...ejerciciosActuales, ejercicioDocumentId])]
+
+    // Crear el body con los IDs actualizados
     const requestData = {
-      data: {
-        ejercicios: {
-        id: ejercicioId ,
-        },
-      },
+      "data": {
+        "ejercicios": nuevosEjercicios.map(id => ({ id }))
+      }
     }
 
-    //console.log("Datos a enviar:", JSON.stringify(requestData, null, 2))
+    console.log("Datos a enviar:", JSON.stringify(requestData, null, 2))
 
-    // Realizar la petición a la API
-    const response = await fetchAPI(`/api/rutinas/${rutinaId}`, {
+    // Actualizar rutina con los ejercicios actualizados
+    const response = await fetchAPI(`/api/rutinas/${rutinaDocumentId}`, {
       method: "PUT",
       body: JSON.stringify(requestData),
     })
 
     console.log("Respuesta de la API:", response)
 
-    // Obtener la rutina actualizada
     return response
   } catch (error) {
     console.error("Error detallado al añadir ejercicio a la rutina:", error)
-
-    // Propagar el error con información adicional
     if (error instanceof Error) {
       throw new Error(`Error al añadir ejercicio: ${error.message}`)
     } else {
