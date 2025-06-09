@@ -219,9 +219,7 @@ export const checkPremiumAccess = async (redirectIfNotPremium = true): Promise<b
 
 // Función para obtener los datos del usuario
 export const getDatosUsuario = async (): Promise<DatoUsuario | null> => {
-  if (!isAuthenticated()) {
-    return null;
-  }
+
 
   try {
     const user = await getCurrentUser();
@@ -253,10 +251,6 @@ export const getDatosUsuario = async (): Promise<DatoUsuario | null> => {
 
 // Función para obtener los objetivos del usuario
 export const getObjetivosUsuario = async (): Promise<Objetivo | null> => {
-  if (!isAuthenticated()) {
-    return null;
-  }
-
   try {
     const user = await getCurrentUser();
     const id = user?.id;
